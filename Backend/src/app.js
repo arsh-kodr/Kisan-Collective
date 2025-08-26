@@ -6,24 +6,27 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 
 const routes = require("./routes/index.route");
-const authRoutes = require("./routes/auth.routes");
 
 const app = express();
-app.use(express.json());
 
-// 🔹 Middlewares
+// Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+
+// Allow credentials so refresh cookie can be sent by browser; set FRONTEND_URL in .env
+app.use(cors({
+  origin: process.env.FRONTEND_URL || true, // in prod set FRONTEND_URL explicitly
+  credentials: true,
+}));
+
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(cookieParser());
 
-// 🔹 Main Routes
+// Routes
 app.use("/api", routes);
-app.use("/api/auth", authRoutes);
 
-// 🔹 Base Route
+// Base route
 app.get("/", (req, res) => {
   res.send("🌾 Kisan Collective API is running");
 });

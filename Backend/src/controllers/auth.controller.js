@@ -1,3 +1,4 @@
+// src/controllers/auth.controller.js
 const User = require("../models/user.model");
 const RefreshToken = require("../models/refreshToken.model");
 const {
@@ -6,37 +7,37 @@ const {
   verifyRefreshToken,
   calculateExpiryDate,
 } = require("../utils/token.util");
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
 // cookie helper
 const cookieOptions = {
   httpOnly: true,
-  sameSite: "lax", // adjust in prod to "none" if cross-site and secure true
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   secure: process.env.NODE_ENV === "production",
-  maxAge: 1000 * 60 * 60 * 24 * 7, // fallback 7 days in ms
+  maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
 
 const register = async (req, res) => {
   try {
     const { username, fullName, email, password, mobile, role } = req.body;
 
-    // basic checks
     if (!username || !email || !password || !mobile) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const existing = await User.findOne({ $or: [{ username }, { email }, { mobile }] });
+    const existing = await User.findOne({
+      $or: [{ username }, { email }, { mobile }],
+    });
     if (existing) return res.status(409).json({ message: "User already exists" });
 
     const user = await User.create({ username, fullName, email, password, mobile, role });
-  
+
+    // <-- FIX: use the created instance 'user' (not User model)
     const payload = { sub: user._id, role: user.role };
 
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    // persist refresh token
     const expiresAt = calculateExpiryDate(process.env.REFRESH_TOKEN_EXP);
     await RefreshToken.create({
       user: user._id,
@@ -45,17 +46,12 @@ const register = async (req, res) => {
       createdByIp: req.ip,
     });
 
-    // set cookie
+    // send refresh token as HttpOnly cookie, accessToken in JSON
     res.cookie("refreshToken", refreshToken, cookieOptions);
 
     return res.status(201).json({
       message: "User registered successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user._id, username: user.username, email: user.email, role: user.role },
       accessToken,
     });
   } catch (err) {
@@ -68,45 +64,48 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-   
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // 🔹 Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // 🔹 Compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // 🔹 Generate JWT token
-    const accessToken = jwt.sign(
-      { sub: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
+    const payload = { sub: user._id, role: user.role };
 
-    res.json({
+    // Generate tokens
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    // Persist refresh token
+    const expiresAt = calculateExpiryDate(process.env.REFRESH_TOKEN_EXP);
+    await RefreshToken.create({
+      user: user._id,
+      token: refreshToken,
+      expiresAt,
+      createdByIp: req.ip,
+    });
+
+    // Set refresh token cookie
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+
+    return res.json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user._id, username: user.username, email: user.email, role: user.role },
       accessToken,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error(error);
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 const refresh = async (req, res) => {
   try {

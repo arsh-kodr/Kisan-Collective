@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "Kisan Collective - Auth Flow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "auth-flow-kisan-collective"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"arshrai\",\n  \"fullName\": {\"firstName\": \"Arsh\", \"lastName\": \"Rai\"},\n  \"email\": \"arsh@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/auth/register",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"arsh@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/auth/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Get Profile (Protected)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "http://localhost:5000/api/users/profile",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "users", "profile"]
+        }
+      }
+    },
+    {
+      "name": "Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/auth/refresh",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "auth", "refresh"]
+        }
+      }
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "http://localhost:5000/api/auth/logout",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "auth", "logout"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
+  ]
+}
