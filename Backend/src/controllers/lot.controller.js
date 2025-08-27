@@ -4,20 +4,38 @@ const Listing = require("../models/listing.model");
 // FPO creates a lot by pooling listings
 const createLot = async (req, res) => {
   try {
-    const { name, listingIds } = req.body;
-    if (!listingIds || !listingIds.length)
+    const { name, listingId } = req.body;
+    if (!name) return res.status(400).json({ message: "Lot name is required" });
+    if (!listingId || !listingId.length)
       return res.status(400).json({ message: "Select at least one listing" });
 
-    const listings = await Listing.find({ _id: { $in: listingIds }, farmer: { $exists: true } });
+    // Fetch open listings not already pooled
+    const listings = await Listing.find({
+      _id: { $in: listingId },
+      status: "open",
+      lot: null,
+    });
 
-    const totalQuantity = listings.reduce((sum, l) => sum + l.quantity, 0);
+    if (!listings.length) {
+      return res.status(400).json({ message: "No eligible listings to pool" });
+    }
 
+    // Compute quantity from quantityKg
+    const totalQuantity = listings.reduce((sum, l) => sum + (l.quantityKg || 0), 0);
+
+    // Create lot
     const lot = await Lot.create({
       name,
       fpo: req.user.sub,
-      listings: listingIds,
+      listings: listings.map(l => l._id),
       totalQuantity,
     });
+
+    // Mark listings as pooled and link to lot
+    await Listing.updateMany(
+      { _id: { $in: listings.map(l => l._id) } },
+      { $set: { status: "pooled", lot: lot._id } }
+    );
 
     res.status(201).json({ message: "Lot created successfully", lot });
   } catch (err) {
@@ -29,7 +47,10 @@ const createLot = async (req, res) => {
 // Get all lots (for buyers or FPOs)
 const getLots = async (req, res) => {
   try {
-    const lots = await Lot.find().populate("fpo", "username").populate("listings");
+    const lots = await Lot.find()
+      .populate("fpo", "username")
+      .populate({ path: "listings", select: "crop quantityKg unit status" })
+      .populate({ path: "winningBid", populate: { path: "bidder", select: "username email" } });
     res.json({ lots });
   } catch (err) {
     console.error(err);
@@ -40,7 +61,9 @@ const getLots = async (req, res) => {
 // Get lots created by this FPO
 const getMyLots = async (req, res) => {
   try {
-    const lots = await Lot.find({ fpo: req.user.sub }).populate("listings");
+    const lots = await Lot.find({ fpo: req.user.sub })
+      .populate({ path: "listings", select: "crop quantityKg unit status" })
+      .populate({ path: "winningBid", populate: { path: "bidder", select: "username email" } });
     res.json({ lots });
   } catch (err) {
     console.error(err);
