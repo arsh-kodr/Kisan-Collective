@@ -19,7 +19,17 @@ const cookieOptions = {
 
 const register = async (req, res) => {
   try {
-    const { username, fullName, email, password, mobile, role } = req.body;
+    const {
+      username,
+      fullName,
+      email,
+      password,
+      mobile,
+      role,
+      companyName,
+      gstNumber,
+      companyAddress,
+    } = req.body;
 
     if (!username || !email || !password || !mobile) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -28,9 +38,19 @@ const register = async (req, res) => {
     const existing = await User.findOne({
       $or: [{ username }, { email }, { mobile }],
     });
-    if (existing) return res.status(409).json({ message: "User already exists" });
-
-    const user = await User.create({ username, fullName, email, password, mobile, role });
+    if (existing)
+      return res.status(409).json({ message: "User already exists" });
+    const user = await User.create({
+      username,
+      fullName,
+      email,
+      password,
+      mobile,
+      role,
+      companyName,
+      gstNumber,
+      companyAddress,
+    });
 
     // <-- FIX: use the created instance 'user' (not User model)
     const payload = { sub: user._id, role: user.role };
@@ -51,7 +71,12 @@ const register = async (req, res) => {
 
     return res.status(201).json({
       message: "User registered successfully",
-      user: { id: user._id, username: user.username, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
       accessToken,
     });
   } catch (err) {
@@ -65,7 +90,9 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     const user = await User.findOne({ email });
@@ -98,12 +125,19 @@ const login = async (req, res) => {
 
     return res.json({
       message: "Login successful",
-      user: { id: user._id, username: user.username, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
       accessToken,
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -122,7 +156,8 @@ const refresh = async (req, res) => {
 
     // verify in DB & not revoked & not expired
     const stored = await RefreshToken.findOne({ token });
-    if (!stored || stored.revoked) return res.status(401).json({ message: "Refresh token revoked" });
+    if (!stored || stored.revoked)
+      return res.status(401).json({ message: "Refresh token revoked" });
     if (new Date() > new Date(stored.expiresAt)) {
       return res.status(401).json({ message: "Refresh token expired" });
     }
@@ -161,7 +196,10 @@ const logout = async (req, res) => {
   try {
     const token = req.cookies?.refreshToken;
     if (token) {
-      await RefreshToken.findOneAndUpdate({ token }, { revoked: true, revokedByIp: req.ip });
+      await RefreshToken.findOneAndUpdate(
+        { token },
+        { revoked: true, revokedByIp: req.ip }
+      );
     }
     res.clearCookie("refreshToken");
     return res.json({ message: "Logged out" });

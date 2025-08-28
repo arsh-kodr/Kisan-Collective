@@ -34,6 +34,22 @@ const userSchema = new mongoose.Schema(
       unique: true,
       match: [/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number"],
     },
+
+    companyName: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    gstNumber: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    companyAddress: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     role: {
       type: String,
       enum: ["farmer", "buyer", "fpo", "admin"],

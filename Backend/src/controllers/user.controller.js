@@ -17,15 +17,27 @@ const getProfile = async (req, res) => {
 // PUT /me
 const updateProfile = async (req, res) => {
   try {
-    const updates = (({ username, email, fullName }) => ({
-      username, email, fullName
+    const updates = (({
+      username,
+      email,
+      fullName,
+      mobile,
+      companyName,
+      gstNumber,
+      companyAddress,
+    }) => ({
+      username,
+      email,
+      fullName,
+      mobile,
+      companyName,
+      gstNumber,
+      companyAddress,
     }))(req.body);
 
-    const user = await userModel.findByIdAndUpdate(
-      req.user.sub,
-      { $set: updates },
-      { new: true }
-    ).select("-password");
+    const user = await userModel
+      .findByIdAndUpdate(req.user.sub, { $set: updates }, { new: true })
+      .select("-password");
 
     res.json({ message: "Profile updated successfully", user });
   } catch (err) {
@@ -40,13 +52,16 @@ const changePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword || !newPassword)
-      return res.status(400).json({ message: "Both old and new passwords required" });
+      return res
+        .status(400)
+        .json({ message: "Both old and new passwords required" });
 
     const user = await userModel.findById(req.user.sub);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Old password is incorrect" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Old password is incorrect" });
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();

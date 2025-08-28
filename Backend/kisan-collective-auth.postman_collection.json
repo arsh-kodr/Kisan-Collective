@@ -168,7 +168,7 @@
             "url": "{{base_url}}/api/lots",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Wheat Lot 1\",\n  \"listings\": [\"<listingId>\"]\n}"
+              "raw": "{\n  \"name\": \"Wheat Lot 1\",\n  \"listingId\": [\"<listingId>\"]\n}"
             }
           }
         },
@@ -229,11 +229,12 @@
       ]
     }
   ],
-  "variable": [
-    { "key": "base_url", "value": "http://localhost:5000" },
-    { "key": "token", "value": "" },
-    { "key": "farmer_token", "value": "" },
-    { "key": "buyer_token", "value": "" },
-    { "key": "fpo_token", "value": "" }
-  ]
+"variable": [
+  { "key": "base_url", "value": "http://localhost:3000" },
+  { "key": "token", "value": "" },
+  { "key": "farmer_token", "value": "" },
+  { "key": "buyer_token", "value": "" },
+  { "key": "fpo_token", "value": "" }
+]
+
 }
