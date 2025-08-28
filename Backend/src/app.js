@@ -8,6 +8,12 @@ const cookieParser = require("cookie-parser");
 const routes = require("./routes/index.route");
 
 const app = express();
+const expressRaw = express.raw;
+
+// Raw webhook handler mount BEFORE express.json()
+const { webhookHandler } = require("./controllers/payment.controller");
+
+app.post("/api/payments/webhook", expressRaw({ type: "application/json" }), webhookHandler);
 
 // Middlewares
 app.use(express.json());

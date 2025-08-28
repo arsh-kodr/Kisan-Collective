@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Kisan Collective API",
-    "_postman_id": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
-    "description": "Postman collection for testing all routes of Kisan Collective backend (Auth, User, Listings, Lots, Bids)",
+    "name": "Kisan Collective API (Full with Payments)",
+    "_postman_id": "merged-collection-1234",
+    "description": "Postman collection for testing all routes of Kisan Collective backend (Auth, User, Listings, Lots, Bids, Payments with Razorpay)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -227,14 +227,107 @@
           }
         }
       ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Initiate Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotId\": \"{{lotId}}\",\n  \"bidId\": \"{{bidId}}\",\n  \"amount\": 500\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/initiate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "initiate"]
+            }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{razorpay_order_id}}\",\n  \"paymentId\": \"{{razorpay_payment_id}}\",\n  \"signature\": \"{{razorpay_signature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "verify"]
+            }
+          }
+        },
+        {
+          "name": "Get My Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment/my-transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "my-transactions"]
+            }
+          }
+        },
+        {
+          "name": "Get Lot Payments (FPO/Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{fpo_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment/lot/{{lotId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "lot", "{{lotId}}"]
+            }
+          }
+        },
+        {
+          "name": "Webhook (test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_test123\",\n        \"amount\": 50000\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "webhook"]
+            }
+          }
+        }
+      ]
     }
   ],
-"variable": [
-  { "key": "base_url", "value": "http://localhost:3000" },
-  { "key": "token", "value": "" },
-  { "key": "farmer_token", "value": "" },
-  { "key": "buyer_token", "value": "" },
-  { "key": "fpo_token", "value": "" }
-]
-
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "farmer_token", "value": "" },
+    { "key": "buyer_token", "value": "" },
+    { "key": "fpo_token", "value": "" },
+    { "key": "lotId", "value": "" },
+    { "key": "bidId", "value": "" },
+    { "key": "razorpay_order_id", "value": "" },
+    { "key": "razorpay_payment_id", "value": "" },
+    { "key": "razorpay_signature", "value": "" }
+  ]
 }

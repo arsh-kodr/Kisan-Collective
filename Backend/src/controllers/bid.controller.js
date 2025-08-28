@@ -1,3 +1,6 @@
+const mongoose = require("mongoose");
+
+
 const Bid = require("../models/bid.model");
 const Lot = require("../models/lot.model");
 
@@ -5,6 +8,10 @@ const Lot = require("../models/lot.model");
 const placeBid = async (req, res) => {
   try {
     const { lotId, amount } = req.body;
+    
+      if (!mongoose.Types.ObjectId.isValid(lotId)) {
+      return res.status(400).json({ message: "Invalid lotId" });
+    }
     if (!lotId || !amount) return res.status(400).json({ message: "lotId and amount are required" });
     if (amount <= 0) return res.status(400).json({ message: "Bid amount must be > 0" });
 

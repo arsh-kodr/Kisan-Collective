@@ -6,6 +6,7 @@ const userRoutes = require("./user.route");
 const listingRoutes = require("./listing.route"); 
 const lotRoutes = require("./lot.route")
 const bidRoutes = require("./bid.route");  
+const paymentRoutes = require("./payment.route");
 
 const router = express.Router();
 
@@ -16,6 +17,7 @@ router.use("/user", userRoutes);
 router.use("/listings", listingRoutes);
 router.use("/lots" , lotRoutes);
 router.use("/bids", bidRoutes);    
+router.use("/payments", paymentRoutes);
 
 
 module.exports = router;
