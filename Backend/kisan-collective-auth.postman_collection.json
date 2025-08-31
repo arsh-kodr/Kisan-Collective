@@ -204,7 +204,9 @@
           "name": "Get My Bids",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{buyer_token}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" }
+            ],
             "url": "{{base_url}}/api/bids/my-bids"
           }
         },
@@ -301,9 +303,7 @@
           "name": "Webhook (test)",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_test123\",\n        \"amount\": 50000\n      }\n    }\n  }\n}"
@@ -312,6 +312,61 @@
               "raw": "{{base_url}}/api/payment/webhook",
               "host": ["{{base_url}}"],
               "path": ["api", "payment", "webhook"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order (Buyer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/orders/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotId\": \"{{lotId}}\",\n  \"shippingAddress\": {\n    \"fullName\": \"Shyam Patel\",\n    \"phone\": \"9876500000\",\n    \"addressLine1\": \"123 Main Street\",\n    \"city\": \"Ahmedabad\",\n    \"state\": \"Gujarat\",\n    \"postalCode\": \"380001\",\n    \"country\": \"India\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Orders (Buyer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyer_token}}" }
+            ],
+            "url": "{{base_url}}/api/orders/my-orders"
+          }
+        },
+        {
+          "name": "Get Orders for FPO",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{fpo_token}}" }
+            ],
+            "url": "{{base_url}}/api/orders/fpo-orders"
+          }
+        },
+        {
+          "name": "Update Order Status (FPO/Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{fpo_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/orders/{{orderId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}"
             }
           }
         }
@@ -326,6 +381,7 @@
     { "key": "fpo_token", "value": "" },
     { "key": "lotId", "value": "" },
     { "key": "bidId", "value": "" },
+    { "key": "orderId", "value": "" },
     { "key": "razorpay_order_id", "value": "" },
     { "key": "razorpay_payment_id", "value": "" },
     { "key": "razorpay_signature", "value": "" }
