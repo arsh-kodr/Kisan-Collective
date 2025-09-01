@@ -57,16 +57,26 @@ const createLot = async (req, res) => {
 const getLots = async (req, res) => {
   try {
     const lots = await Lot.find()
-      .populate("fpo", "username")
-      .populate({ path: "listings", select: "crop quantityKg unit status" })
-      .populate({
-        path: "winningBid",
-        populate: { path: "bidder", select: "username email" },
-      });
+      .populate("fpo", "username email")
+      .populate("listings");
 
-    res.json({ lots });
+    // fetch highest bid for each lot
+    const lotsWithHighestBid = await Promise.all(
+      lots.map(async (lot) => {
+        const highestBid = await Bid.findOne({ lot: lot._id })
+          .sort({ amount: -1 })
+          .populate("bidder", "username email");
+
+        return {
+          ...lot.toObject(),
+          highestBid: highestBid || null,
+        };
+      })
+    );
+
+    res.json(lotsWithHighestBid);
   } catch (err) {
-    console.error("Error in getLots:", err);
+    console.error("Error fetching lots:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -76,16 +86,26 @@ const getLots = async (req, res) => {
 // ===============================
 const getMyLots = async (req, res) => {
   try {
-    const lots = await Lot.find({ fpo: req.user.sub })
-      .populate({ path: "listings", select: "crop quantityKg unit status" })
-      .populate({
-        path: "winningBid",
-        populate: { path: "bidder", select: "username email" },
-      });
+    const lots = await Lot.find({ fpo: req.user._id })
+      .populate("fpo", "username email")
+      .populate("listings");
 
-    res.json({ lots });
+    const lotsWithHighestBid = await Promise.all(
+      lots.map(async (lot) => {
+        const highestBid = await Bid.findOne({ lot: lot._id })
+          .sort({ amount: -1 })
+          .populate("bidder", "username email");
+
+        return {
+          ...lot.toObject(),
+          highestBid: highestBid || null,
+        };
+      })
+    );
+
+    res.json(lotsWithHighestBid);
   } catch (err) {
-    console.error("Error in getMyLots:", err);
+    console.error("Error fetching FPO lots:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -134,9 +154,40 @@ const closeLot = async (req, res) => {
   }
 };
 
+// ===============================
+// Get lot by ID
+// ===============================
+const getLotById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const lot = await Lot.findById(id)
+      .populate("fpo", "username email")
+      .populate("listings"); // so you get crop, quantityKg, etc.
+
+    if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+    // fetch bids for this lot
+    const bids = await Bid.find({ lot: id })
+      .sort({ amount: -1 })
+      .populate("bidder", "username email");
+
+    res.json({
+      ...lot.toObject(),
+      bids, // attach bids array
+    });
+  } catch (err) {
+    console.error("Error fetching lot details:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
 module.exports = {
   createLot,
   getLots,
   getMyLots,
   closeLot,
+  getLotById,   // ✅ add this
 };

@@ -1,91 +1,30 @@
-const Order = require("../models/order.model");
-const Lot = require("../models/lot.model");
-const Bid = require("../models/bid.model");
+const mongoose = require("mongoose");
 
-// Create Order (called after auction close)
-const createOrder = async (req, res) => {
-  try {
-    const { lotId } = req.body;
+const orderSchema = new mongoose.Schema(
+  {
+    lot: { type: mongoose.Schema.Types.ObjectId, ref: "Lot", required: true },
+    buyer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    fpo: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    bid: { type: mongoose.Schema.Types.ObjectId, ref: "Bid", required: true },
+    amount: { type: Number, required: true },
 
-    const lot = await Lot.findById(lotId).populate("winningBid");
-    if (!lot) return res.status(404).json({ message: "Lot not found" });
-    if (!lot.winningBid) return res.status(400).json({ message: "No winning bid for this lot" });
+    // 🔗 Link to transaction
+    transaction: { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
 
-    const bid = await Bid.findById(lot.winningBid);
-    if (!bid) return res.status(404).json({ message: "Winning bid not found" });
+    shippingAddress: {
+      address: String,
+      city: String,
+      state: String,
+      pincode: String,
+    },
 
-    // Ensure only the winning buyer can create order
-    if (String(bid.bidder) !== req.user.sub) {
-      return res.status(403).json({ message: "Only winning bidder can create this order" });
-    }
+    status: {
+      type: String,
+      enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
+      default: "pending",
+    },
+  },
+  { timestamps: true }
+);
 
-    const order = await Order.create({
-      lot: lot._id,
-      buyer: bid.bidder,
-      fpo: lot.fpo,
-      bid: bid._id,
-      amount: bid.amount,
-      shippingAddress: req.body.shippingAddress || {}, // buyer can pass at checkout
-    });
-
-    res.status(201).json({ message: "Order created successfully", order });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Get my orders (buyer)
-const getMyOrders = async (req, res) => {
-  try {
-    const orders = await Order.find({ buyer: req.user.sub })
-      .populate("lot", "name status")
-      .populate("fpo", "username email")
-      .sort({ createdAt: -1 });
-
-    res.json({ orders });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Get orders for FPO (their lots)
-const getFpoOrders = async (req, res) => {
-  try {
-    const orders = await Order.find({ fpo: req.user.sub })
-      .populate("lot", "name status")
-      .populate("buyer", "username email")
-      .sort({ createdAt: -1 });
-
-    res.json({ orders });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Update order status (FPO/Admin) - e.g., shipped/delivered
-const updateOrderStatus = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const { status } = req.body;
-
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (req.user.role !== "admin" && String(order.fpo) !== req.user.sub) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    order.status = status;
-    await order.save();
-
-    res.json({ message: "Order updated successfully", order });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-module.exports = { createOrder, getMyOrders, getFpoOrders, updateOrderStatus };
+module.exports = mongoose.model("Order", orderSchema);
