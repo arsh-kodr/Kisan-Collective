@@ -1,6 +1,7 @@
 const Order = require("../models/order.model");
 const Lot = require("../models/lot.model");
 const Bid = require("../models/bid.model");
+const { Model, model } = require("mongoose");
 
 // Create Order (called after auction close)
 const createOrder = async (req, res) => {
@@ -95,3 +96,5 @@ const updateOrderStatus = async (req, res) => {
 };
 
 module.exports = { createOrder, getMyOrders, getFpoOrders, updateOrderStatus };
+
+

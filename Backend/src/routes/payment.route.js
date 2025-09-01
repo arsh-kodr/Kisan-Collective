@@ -33,7 +33,11 @@ router.get("/lot/:lotId", authenticate, authorize(["fpo", "admin"]), async (req,
   res.json({ payments: txs });
 });
 
-// webhook (we'll wire express.raw later when enabling)
-router.post("/webhook", webhookHandler);
+// Razorpay webhook (⚠️ needs raw body parsing, not JSON)
+router.post(
+  "/webhook",
+  express.raw({ type: "application/json" }), // raw body required
+  webhookHandler
+);
 
 module.exports = router;
