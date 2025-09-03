@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import { socket } from "../socket";
 
-const BidsList = ({ lotId }) => {
+const BidsList = ({ lotId, winningBidId }) => {
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +24,7 @@ const BidsList = ({ lotId }) => {
   useEffect(() => {
     fetchBids();
 
-    // listen for new bids
+    // Listen for new bids
     socket.on(`bid:new:${lotId}`, () => {
       fetchBids();
     });
@@ -40,28 +40,34 @@ const BidsList = ({ lotId }) => {
     );
   }
 
+  if (bids.length === 0) {
+    return <p className="text-gray-600">No bids yet</p>;
+  }
+
   return (
     <div className="mt-4">
-      {bids.length > 0 ? (
-        <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
-          {bids.map((b) => (
+      <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
+        {bids.map((b) => {
+          const isWinner = winningBidId && b._id === winningBidId;
+          return (
             <li
               key={b._id}
-              className="flex justify-between items-center px-4 py-3 text-sm bg-white hover:bg-gray-50 transition"
+              className={`flex justify-between items-center px-4 py-3 text-sm transition
+                ${isWinner ? "bg-yellow-100 border-l-4 border-yellow-500 font-bold" : "bg-white hover:bg-gray-50"}`}
             >
               <span className="font-medium text-gray-700">
                 {b.bidder?.username || "Unknown"}
               </span>
-              <span className="text-green-700 font-semibold">₹{b.amount}</span>
+              <span className={`font-semibold ${isWinner ? "text-yellow-700" : "text-green-700"}`}>
+                ₹{b.amount}
+              </span>
               <span className="text-xs text-gray-500">
                 {new Date(b.createdAt).toLocaleString()}
               </span>
             </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-600">No bids yet</p>
-      )}
+          );
+        })}
+      </ul>
     </div>
   );
 };

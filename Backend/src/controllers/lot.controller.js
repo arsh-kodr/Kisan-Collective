@@ -2,6 +2,7 @@ const Lot = require("../models/lot.model");
 const Listing = require("../models/listing.model");
 const Bid = require("../models/bid.model");
 const mongoose = require('mongoose');
+const { scheduleLotClosure } = require("../utils/auctionScheduler");
 const { getPagination, parseSort, escapeRegex } = require('../utils/pagination');
 
 // ===============================
@@ -39,6 +40,8 @@ const createLot = async (req, res) => {
       totalQuantity,
       status: "open",
     });
+
+    if (io) scheduleLotClosure(io, lot);
 
     // Mark listings as pooled and link to lot
     await Listing.updateMany(
@@ -239,47 +242,31 @@ const getMyLots = async (req, res) => {
 // ===============================
 // Close Auction (FPO action)
 // ===============================
-const closeLot = async (req, res) => {
+const closeLot = async (req, res, io) => {
   try {
     const { lotId } = req.params;
-
-    const lot = await Lot.findById(lotId).populate("listings");
+    const lot = await Lot.findById(lotId);
     if (!lot) return res.status(404).json({ message: "Lot not found" });
+    if (lot.status !== "open")
+      return res.status(400).json({ message: "Lot already closed" });
 
-    if (lot.status !== "open") {
-      return res
-        .status(400)
-        .json({ message: "Lot already closed or processed" });
-    }
-
-    // Find highest bid
-    const topBid = await Bid.findOne({ lot: lotId })
-      .sort({ amount: -1 })
-      .populate("bidder", "username email");
-
-    if (!topBid) {
-      // No bids placed
-      lot.status = "closed";
-      await lot.save();
-      return res.json({ message: "Lot closed with no bids", lot });
-    }
-
-    // Set winning bid + close lot
+    const topBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 });
     lot.status = "closed";
-    lot.winningBid = topBid._id;
+    lot.winningBid = topBid?._id || null;
     await lot.save();
 
-    res.json({
-      message: "Lot closed successfully. Winner declared.",
-      lot,
-      winner: topBid,
-    });
+    // Emit events
+    if (io) {
+      io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, { winningBid: topBid });
+      io.emit("lot:ended", { lotId });
+    }
+
+    res.json({ message: "Lot closed successfully", lot, winner: topBid });
   } catch (err) {
-    console.error("Error in closeLot:", err);
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 // ===============================
 // Get lot by ID
 // ===============================
@@ -308,6 +295,36 @@ const getLotById = async (req, res) => {
   }
 };
 
+// ===============================
+// Auto-close a single lot
+// ===============================
+const autoCloseLot = async (lotId, io) => {
+  try {
+    const lot = await Lot.findById(lotId);
+    if (!lot || lot.status !== "open") return;
+
+    // Find highest bid
+    const topBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 });
+
+    lot.status = "closed";
+    lot.winningBid = topBid?._id || null;
+    await lot.save();
+
+    // Notify all clients in the lot room
+    if (io) {
+      io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, {
+        winningBid: topBid,
+      });
+      io.emit("lot:ended", { lotId }); // disables bid forms globally
+    }
+
+    console.log(`Lot ${lotId} auto-closed`);
+  } catch (err) {
+    console.error("Error in autoCloseLot:", err);
+  }
+};
+
+
 
 
 module.exports = {
@@ -315,5 +332,6 @@ module.exports = {
   getLots,
   getMyLots,
   closeLot,
-  getLotById,   
+  getLotById, 
+  autoCloseLot  
 };

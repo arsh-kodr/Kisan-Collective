@@ -1,9 +1,10 @@
-// server.js
 require("dotenv").config();
 const http = require("http");
 const app = require("./src/app");
 const connectToDB = require("./src/config/db");
 const { Server } = require("socket.io");
+const Lot = require("./src/models/lot.model");
+const { autoCloseLot } = require("./src/controllers/lot.controller");
 
 const PORT = process.env.PORT || 3000;
 
@@ -11,57 +12,67 @@ const PORT = process.env.PORT || 3000;
   try {
     await connectToDB();
 
-    // ✅ Create HTTP server from Express app
     const server = http.createServer(app);
 
-    // ✅ Attach socket.io to this server
     const io = new Server(server, {
       cors: {
         origin: [
           process.env.FRONTEND_URL || "http://localhost:5173",
           "http://localhost:5173",
-          "https://kisan-collective-frontend.onrender.com"
+          "https://kisan-collective-frontend.onrender.com",
         ],
         methods: ["GET", "POST"],
         credentials: true,
       },
-      transports: ["websocket", "polling"], // allow both
-      allowEIO3: true, // ✅ compatibility with older clients/proxies
+      transports: ["polling", "websocket"],
+      allowEIO3: true,
     });
 
-    // ✅ Socket.IO events
+    // Socket connections
     io.on("connection", (socket) => {
-      console.log("✅ Socket connected:", socket.id);
+      console.log("Socket connected:", socket.id);
 
       socket.on("join:lot", (lotId) => {
-        if (lotId) {
-          socket.join(`lot:${lotId}`);
-          console.log(`🔗 Joined room lot:${lotId}`);
-        }
+        if (lotId) socket.join(`lot:${lotId}`);
       });
 
       socket.on("leave:lot", (lotId) => {
-        if (lotId) {
-          socket.leave(`lot:${lotId}`);
-          console.log(`❌ Left room lot:${lotId}`);
-        }
+        if (lotId) socket.leave(`lot:${lotId}`);
       });
 
       socket.on("disconnect", () => {
-        console.log("❌ Socket disconnected:", socket.id);
+        console.log("Socket disconnected:", socket.id);
       });
     });
 
-    // ✅ Make io available in controllers
+    // Attach io to app so controllers can use it
     app.set("io", io);
 
-    // ✅ Start server
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
+    // ===============================
+    // Auto-close lots whose endTime passed every 5 seconds
+    // ===============================
+    const AUTO_CLOSE_INTERVAL = 5000;
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const lotsToClose = await Lot.find({
+          status: "open",
+          endTime: { $lte: now },
+        });
 
+        for (const lot of lotsToClose) {
+          await autoCloseLot(lot._id, io);
+        }
+      } catch (err) {
+        console.error("Error auto-closing lots:", err);
+      }
+    }, AUTO_CLOSE_INTERVAL);
+
+    server.listen(PORT, () =>
+      console.log(`Server running on http://localhost:${PORT}`)
+    );
   } catch (err) {
-    console.error("❌ Failed to start server:", err);
+    console.error("Failed to start server:", err);
     process.exit(1);
   }
 })();

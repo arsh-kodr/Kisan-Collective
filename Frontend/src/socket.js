@@ -13,4 +13,28 @@ export const socket = io(BACKEND_URL, {
   reconnection: true,
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
+   forceNew: true,
+});
+
+// -----------------------
+// Socket event logging
+// -----------------------
+socket.on("connect", () => {
+  console.log("✅ Socket connected:", socket.id);
+});
+
+socket.on("connect_error", (err) => {
+  console.error("❌ Socket connection error:", err.message);
+});
+
+socket.on("disconnect", (reason) => {
+  console.log("⚡ Socket disconnected:", reason);
+});
+
+socket.on("reconnect_attempt", (attempt) => {
+  console.log(`🔄 Socket attempting to reconnect (attempt ${attempt})`);
+});
+
+socket.on("reconnect_failed", () => {
+  console.error("❌ Socket failed to reconnect after max attempts");
 });

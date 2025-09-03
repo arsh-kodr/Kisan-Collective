@@ -1,25 +1,24 @@
-// src/components/PlaceBidForm.jsx
 import { useState, useEffect, useRef } from "react";
 import api from "../api";
 import toast from "react-hot-toast";
+import { socket } from "../socket";
 
-const PlaceBidForm = ({ lotId, onBidPlaced }) => {
+const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
   const [amount, setAmount] = useState("");
   const [highestBid, setHighestBid] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetchingHighest, setFetchingHighest] = useState(true);
-  const prevHighest = useRef(null); // ✅ to track last highest bid
+  const [disabled, setDisabled] = useState(false);
+  const prevHighest = useRef(null);
 
-  // ✅ Fetch current highest bid
+  // Fetch the current highest bid
   const fetchHighest = async () => {
+    if (disabled) return;
     try {
       setFetchingHighest(true);
-      const res = await api.get(`/bids/lots/${lotId}/highest`, {
-        withCredentials: true,
-      });
+      const res = await api.get(`/bids/lots/${lotId}/highest`, { withCredentials: true });
       const newHighest = res.data.highestBid || null;
 
-      // 🔥 Show toast if new highest is detected
       if (
         newHighest &&
         prevHighest.current &&
@@ -33,31 +32,43 @@ const PlaceBidForm = ({ lotId, onBidPlaced }) => {
       setHighestBid(newHighest);
       prevHighest.current = newHighest;
     } catch (err) {
-      console.error("Error fetching highest bid:", err);
+      console.error(err);
       toast.error("Failed to fetch highest bid");
     } finally {
       setFetchingHighest(false);
     }
   };
 
+  // Poll highest bid every 8s
   useEffect(() => {
     fetchHighest();
-    const interval = setInterval(fetchHighest, 8000); // refresh every 8s
+    const interval = setInterval(fetchHighest, 8000);
     return () => clearInterval(interval);
+  }, [lotId, disabled]);
+
+  // Socket listener for auction end
+  useEffect(() => {
+    const handleLotEnded = (data) => {
+      if (data.lotId === lotId) {
+        setDisabled(true);
+        toast.error("Auction ended! You can no longer place bids.");
+      }
+    };
+    socket.on("lot:ended", handleLotEnded);
+    return () => socket.off("lot:ended", handleLotEnded);
   }, [lotId]);
 
-  // ✅ Handle bid submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    if (disabled) return;
 
+    setLoading(true);
     try {
       const res = await api.post(
         "/bids/place-bid",
         { lotId, amount: Number(amount) },
         { withCredentials: true }
       );
-
       const newBid = res.data.bid;
       setAmount("");
       setHighestBid(newBid);
@@ -73,6 +84,8 @@ const PlaceBidForm = ({ lotId, onBidPlaced }) => {
     }
   };
 
+  const isHighestBidder = highestBid?.bidder?._id === currentUserId;
+
   return (
     <div className="border rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 shadow-md">
       {/* Header */}
@@ -85,8 +98,9 @@ const PlaceBidForm = ({ lotId, onBidPlaced }) => {
         ) : (
           <span className="text-sm text-gray-600">
             Current Highest:{" "}
-            <span className="font-semibold text-green-700">
+            <span className={`font-semibold ${isHighestBidder ? "text-blue-700" : "text-green-700"}`}>
               {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
+              {isHighestBidder && " (You are highest bidder)"}
             </span>
           </span>
         )}
@@ -101,20 +115,18 @@ const PlaceBidForm = ({ lotId, onBidPlaced }) => {
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Enter bid (min ₹${
-            highestBid ? highestBid.amount + 1 : 1
-          })`}
+          placeholder={`Enter bid (min ₹${highestBid ? highestBid.amount + 1 : 1})`}
           className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition"
           min={highestBid ? highestBid.amount + 1 : 1}
           required
-          disabled={loading}
+          disabled={loading || disabled}
         />
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || disabled}
           className="bg-green-600 text-white px-6 py-2 rounded-xl font-medium shadow hover:bg-green-700 active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? "Placing..." : "Place Bid"}
+          {loading ? "Placing..." : disabled ? "Auction Ended" : "Place Bid"}
         </button>
       </form>
     </div>

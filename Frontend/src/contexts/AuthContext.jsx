@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api from "../api";
 
-const AuthContext = createContext();
+export const AuthContext = createContext(); 
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // track if auth state is loading
+  const [loading, setLoading] = useState(true);
 
-  // Persist login on refresh
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (token) {
@@ -48,4 +47,5 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Hook
 export const useAuth = () => useContext(AuthContext);

@@ -1,13 +1,15 @@
-// src/pages/LotDetail.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../api";
-import { socket } from "../socket";   // 👈 import socket
+import { socket } from "../socket";
 import PlaceBidForm from "../components/PlaceBidForm";
 import BidsList from "../components/BidsList";
+import LotCountdown from "../components/LotCountdown";
+import { AuthContext } from "../contexts/AuthContext";
 
 export default function LotDetail() {
   const { id } = useParams();
+  const { user } = useContext(AuthContext);
   const [lot, setLot] = useState(null);
   const [highestBid, setHighestBid] = useState(null);
   const [error, setError] = useState(null);
@@ -35,14 +37,16 @@ export default function LotDetail() {
     // join socket room
     socket.emit("join:lot", id);
 
-    // handle new bids
-    socket.on(`bid:new:${id}`, (bid) => {
-      setHighestBid(bid);
-    });
+    // listen for new bids
+    socket.on(`bid:new:${id}`, (bid) => setHighestBid(bid));
 
-    // handle auction close
+    // listen for auction closed
     socket.on(`lot:closed:${id}`, (data) => {
-      setLot((prev) => ({ ...prev, status: "sold", winningBid: data.winningBid }));
+      setLot((prev) => ({
+        ...prev,
+        status: "closed",
+        winningBid: data.winningBid,
+      }));
     });
 
     return () => {
@@ -52,15 +56,14 @@ export default function LotDetail() {
     };
   }, [id]);
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex justify-center items-center py-20">
         <p className="text-gray-600 animate-pulse">Loading lot details...</p>
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
       <div className="p-6 text-center text-red-600">
         <p>{error}</p>
@@ -69,24 +72,29 @@ export default function LotDetail() {
         </Link>
       </div>
     );
-  }
+
+  const isClosed = lot?.status !== "open";
+  const isHighestBidder = highestBid?.bidder?._id === user?._id;
 
   return (
     <div className="max-w-3xl mx-auto bg-white shadow rounded-2xl p-6 md:p-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-          {lot?.name}
-        </h2>
-        <span
-          className={`mt-2 md:mt-0 px-3 py-1 text-sm rounded-full font-medium ${
-            lot?.status === "open"
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-200 text-gray-600"
-          }`}
-        >
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">{lot?.name}</h2>
+        <span className={`mt-2 md:mt-0 px-3 py-1 text-sm rounded-full font-medium ${lot?.status === "open" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
           {lot?.status?.toUpperCase()}
         </span>
+        <div className="flex items-center gap-4">
+          {lot.status === "open" && lot.endTime && (
+            <LotCountdown
+              endTime={lot.endTime}
+              onEnd={() => setLot((prev) => ({ ...prev, status: "closed" }))}
+            />
+          )}
+          {isHighestBidder && !isClosed && (
+            <span className="ml-2 text-blue-700 font-semibold">You are the highest bidder</span>
+          )}
+        </div>
       </div>
 
       {/* Info Grid */}
@@ -101,59 +109,46 @@ export default function LotDetail() {
         </div>
         <div>
           <p className="text-sm text-gray-500">FPO</p>
-          <p className="font-semibold text-gray-800">
-            {lot?.fpo?.username || "Unknown"}
-          </p>
+          <p className="font-semibold text-gray-800">{lot?.fpo?.username || "Unknown"}</p>
         </div>
         <div>
           <p className="text-sm text-gray-500">Current Highest Bid</p>
-          <p className="font-semibold text-gray-800">
-            {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
-          </p>
+          <p className="font-semibold text-gray-800">{highestBid ? `₹${highestBid.amount}` : "No bids yet"}</p>
         </div>
       </div>
 
       {/* Listings */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Listings in this Lot
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Listings in this Lot</h3>
         {lot?.listings?.length > 0 ? (
           <ul className="space-y-2">
             {lot.listings.map((listing) => (
-              <li
-                key={listing._id}
-                className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between"
-              >
-                <span>
-                  {listing.crop} - {listing.quantityKg} {listing.unit}
-                </span>
+              <li key={listing._id} className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between">
+                <span>{listing.crop} - {listing.quantityKg} {listing.unit}</span>
                 <span className="text-gray-500">({listing.status})</span>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-gray-600">No listings in this lot.</p>
-        )}
+        ) : <p className="text-gray-600">No listings in this lot.</p>}
       </div>
 
       {/* Place Bid */}
-      {lot?.status === "open" && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">
-            Place Your Bid
-          </h3>
-          <PlaceBidForm
-            lotId={id}
-            onBidPlaced={(newBid) => setHighestBid(newBid)}
-          />
+      {!isClosed ? (
+        <PlaceBidForm
+          lotId={id}
+          onBidPlaced={(newBid) => setHighestBid(newBid)}
+          currentUserId={user?._id}
+        />
+      ) : (
+        <div className="mb-8 p-4 bg-gray-100 rounded-lg text-gray-700">
+          <p>Auction closed. Winning bid: {lot.winningBid ? `₹${lot.winningBid.amount}` : "No bids placed"}</p>
         </div>
       )}
 
       {/* Bids List */}
       <div>
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Bids</h3>
-        <BidsList lotId={id} />
+        <BidsList lotId={id} winningBidId={lot?.winningBid?._id} />
       </div>
     </div>
   );
