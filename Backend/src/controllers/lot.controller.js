@@ -1,6 +1,8 @@
 const Lot = require("../models/lot.model");
 const Listing = require("../models/listing.model");
 const Bid = require("../models/bid.model");
+const mongoose = require('mongoose');
+const { getPagination, parseSort, escapeRegex } = require('../utils/pagination');
 
 // ===============================
 // Create Lot (FPO pools listings)
@@ -56,28 +58,152 @@ const createLot = async (req, res) => {
 // ===============================
 const getLots = async (req, res) => {
   try {
-    const lots = await Lot.find()
-      .populate("fpo", "username email")
-      .populate("listings");
+    const {
+      status = 'open',
+      crop,
+      minPrice,
+      maxPrice,
+      sort = '-createdAt',
+    } = req.query;
 
-    // fetch highest bid for each lot
-    const lotsWithHighestBid = await Promise.all(
-      lots.map(async (lot) => {
-        const highestBid = await Bid.findOne({ lot: lot._id })
-          .sort({ amount: -1 })
-          .populate("bidder", "username email");
+    const { page, limit, skip } = getPagination(req.query);
+    const sortObj = parseSort(sort);
 
-        return {
-          ...lot.toObject(),
-          highestBid: highestBid || null,
-        };
-      })
-    );
+    // Build match stage
+    const match = {};
+    if (status) match.status = status;
 
-    res.json(lotsWithHighestBid);
+    if (typeof minPrice !== 'undefined' || typeof maxPrice !== 'undefined') {
+      match.basePrice = {};
+      if (typeof minPrice !== 'undefined') match.basePrice.$gte = Number(minPrice);
+      if (typeof maxPrice !== 'undefined') match.basePrice.$lte = Number(maxPrice);
+    }
+
+    if (crop) {
+      // listings is an array of ObjectIds referencing Listing; use lookup to filter later.
+      // We'll filter by matching listings.crop with regex via $lookup pipeline below.
+    }
+
+    /**
+     * Aggregation pipeline:
+     * - Optional: lookup listings (and optionally filter by crop)
+     * - Lookup highest bid via pipeline, populate bidder minimal
+     * - Lookup fpo minimal
+     * - Project minimal fields
+     * - Sort + paginate (via facet)
+     */
+    const pipeline = [];
+
+    // Match lots by status and basePrice if provided
+    pipeline.push({ $match: match });
+
+    // Lookup listings documents
+    pipeline.push({
+      $lookup: {
+        from: 'listings',
+        localField: 'listings',
+        foreignField: '_id',
+        as: 'listings',
+      },
+    });
+
+    // If crop filter provided, restrict lots that have at least one listing matching crop
+    if (crop) {
+      pipeline.push({
+        $match: {
+          'listings.crop': { $regex: `^${escapeRegex(crop)}`, $options: 'i' },
+        },
+      });
+    }
+
+    // Lookup highest bid for each lot
+    pipeline.push({
+      $lookup: {
+        from: 'bids',
+        let: { lotId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$lot', '$$lotId'] } } },
+          { $sort: { amount: -1, createdAt: 1 } },
+          { $limit: 1 },
+          { $project: { amount: 1, bidder: 1, createdAt: 1 } }
+        ],
+        as: 'highestBid'
+      }
+    });
+
+    // Unwind highestBid array to object (or null)
+    pipeline.push({
+      $addFields: { highestBid: { $arrayElemAt: ['$highestBid', 0] } }
+    });
+
+    // Populate highestBid.bidder minimal info
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'highestBid.bidder',
+        foreignField: '_id',
+        as: 'highestBid.bidderInfo'
+      }
+    });
+    pipeline.push({
+      $addFields: { 'highestBid.bidder': { $arrayElemAt: ['$highestBid.bidderInfo', 0] } }
+    });
+    pipeline.push({ $project: { 'highestBid.bidderInfo': 0 } });
+
+    // Populate fpo minimal info
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'fpo',
+        foreignField: '_id',
+        as: 'fpo'
+      }
+    });
+    pipeline.push({ $addFields: { fpo: { $arrayElemAt: ['$fpo', 0] } } });
+
+    // Project only needed fields to keep response compact
+    pipeline.push({
+      $project: {
+        name: 1,
+        totalQuantity: 1,
+        basePrice: 1,
+        status: 1,
+        listings: 1,
+        createdAt: 1,
+        'fpo._id': 1,
+        'fpo.username': 1,
+        'highestBid.amount': 1,
+        'highestBid.createdAt': 1,
+        'highestBid.bidder._id': 1,
+        'highestBid.bidder.username': 1,
+      }
+    });
+
+    // Facet: metadata + data (with sort -> skip -> limit)
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $sort: sortObj },
+          { $skip: skip },
+          { $limit: limit }
+        ]
+      }
+    });
+
+    const aggResult = await Lot.aggregate(pipeline).allowDiskUse(true).exec();
+
+    const totalDocs = (aggResult[0].metadata[0] && aggResult[0].metadata[0].total) ? aggResult[0].metadata[0].total : 0;
+    const totalPages = Math.max(Math.ceil(totalDocs / limit), 1);
+    const lots = aggResult[0].data || [];
+
+    return res.json({
+      lots,
+      pagination: { page, limit, totalPages, totalDocs },
+    });
   } catch (err) {
-    console.error("Error fetching lots:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error('Error fetching lots:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -189,5 +315,5 @@ module.exports = {
   getLots,
   getMyLots,
   closeLot,
-  getLotById,   // ✅ add this
+  getLotById,   
 };

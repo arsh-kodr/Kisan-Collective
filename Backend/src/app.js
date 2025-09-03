@@ -6,28 +6,39 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 
 const routes = require("./routes/index.route");
+const { webhookHandler } = require("./controllers/payment.controller");
 
 const app = express();
 const expressRaw = express.raw;
-const { webhookHandler } = require("./controllers/payment.controller");
 
-app.post("/api/payment/webhook", expressRaw({ type: "application/json" }), webhookHandler);
+// Raw webhook endpoint (must be above express.json)
+app.post(
+  "/api/payment/webhook",
+  expressRaw({ type: "application/json" }),
+  webhookHandler
+);
 
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Allow credentials so refresh cookie can be sent by browser; set FRONTEND_URL in .env
-app.use(cors({
-  origin: process.env.FRONTEND_URL || true, // in prod set FRONTEND_URL explicitly
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      process.env.FRONTEND_URL || "http://localhost:5173",
+      "http://localhost:5173", // dev
+      "https://kisan-collective-frontend.onrender.com" // production frontend
+    ],
+    credentials: true,
+  })
+);
+
 
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(cookieParser());
 
-// Routes
+// API routes
 app.use("/api", routes);
 
 // Base route
