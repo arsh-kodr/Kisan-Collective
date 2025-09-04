@@ -4,6 +4,7 @@ const Bid = require("../models/bid.model");
 const mongoose = require('mongoose');
 const { scheduleLotClosure } = require("../utils/auctionScheduler");
 const { getPagination, parseSort, escapeRegex } = require('../utils/pagination');
+const io = require("socket.io");
 
 // ===============================
 // Create Lot (FPO pools listings)
@@ -325,7 +326,50 @@ const autoCloseLot = async (lotId, io) => {
 };
 
 
+const poolListingsIntoLot = async (req, res) => {
+  try {
+    const { listingIds, basePrice, endTime } = req.body;
 
+    if (!listingIds || listingIds.length === 0) {
+      return res.status(400).json({ message: "No listings provided" });
+    }
+
+    // Validate listings
+    const listings = await Listing.find({ _id: { $in: listingIds }, status: "open" });
+
+    if (listings.length !== listingIds.length) {
+      return res.status(400).json({ message: "Some listings are invalid or already pooled" });
+    }
+
+    // Create Lot
+    const lot = await Lot.create({
+      listings: listingIds,
+      basePrice,
+      endTime,
+      fpo: req.user._id,
+      status: "open",
+    });
+
+    // Update listings to pooled
+    await Listing.updateMany(
+      { _id: { $in: listingIds } },
+      { $set: { status: "pooled", lot: lot._id } }
+    );
+
+    // Populate for response
+    await lot.populate("listings fpo");
+
+    // Notify buyers in real-time
+    if (io) {
+      io.emit("lot:created", lot);
+    }
+
+    res.status(201).json(lot);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to create lot" });
+  }
+};
 
 module.exports = {
   createLot,
@@ -333,5 +377,6 @@ module.exports = {
   getMyLots,
   closeLot,
   getLotById, 
-  autoCloseLot  
+  autoCloseLot,
+  poolListingsIntoLot
 };

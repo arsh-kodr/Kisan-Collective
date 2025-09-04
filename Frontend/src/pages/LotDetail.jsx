@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
-import api from "../api";
+import api from "../api/api";
 import { socket } from "../socket";
 import PlaceBidForm from "../components/PlaceBidForm";
 import BidsList from "../components/BidsList";
@@ -80,8 +80,16 @@ export default function LotDetail() {
     <div className="max-w-3xl mx-auto bg-white shadow rounded-2xl p-6 md:p-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">{lot?.name}</h2>
-        <span className={`mt-2 md:mt-0 px-3 py-1 text-sm rounded-full font-medium ${lot?.status === "open" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+          {lot?.name}
+        </h2>
+        <span
+          className={`mt-2 md:mt-0 px-3 py-1 text-sm rounded-full font-medium ${
+            lot?.status === "open"
+              ? "bg-green-100 text-green-700"
+              : "bg-gray-200 text-gray-600"
+          }`}
+        >
           {lot?.status?.toUpperCase()}
         </span>
         <div className="flex items-center gap-4">
@@ -92,7 +100,9 @@ export default function LotDetail() {
             />
           )}
           {isHighestBidder && !isClosed && (
-            <span className="ml-2 text-blue-700 font-semibold">You are the highest bidder</span>
+            <span className="ml-2 text-blue-700 font-semibold">
+              You are the highest bidder
+            </span>
           )}
         </div>
       </div>
@@ -109,27 +119,40 @@ export default function LotDetail() {
         </div>
         <div>
           <p className="text-sm text-gray-500">FPO</p>
-          <p className="font-semibold text-gray-800">{lot?.fpo?.username || "Unknown"}</p>
+          <p className="font-semibold text-gray-800">
+            {lot?.fpo?.username || "Unknown"}
+          </p>
         </div>
         <div>
           <p className="text-sm text-gray-500">Current Highest Bid</p>
-          <p className="font-semibold text-gray-800">{highestBid ? `₹${highestBid.amount}` : "No bids yet"}</p>
+          <p className="font-semibold text-gray-800">
+            {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
+          </p>
         </div>
       </div>
 
       {/* Listings */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Listings in this Lot</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          Listings in this Lot
+        </h3>
         {lot?.listings?.length > 0 ? (
           <ul className="space-y-2">
             {lot.listings.map((listing) => (
-              <li key={listing._id} className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between">
-                <span>{listing.crop} - {listing.quantityKg} {listing.unit}</span>
+              <li
+                key={listing._id}
+                className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between"
+              >
+                <span>
+                  {listing.crop} - {listing.quantityKg} {listing.unit}
+                </span>
                 <span className="text-gray-500">({listing.status})</span>
               </li>
             ))}
           </ul>
-        ) : <p className="text-gray-600">No listings in this lot.</p>}
+        ) : (
+          <p className="text-gray-600">No listings in this lot.</p>
+        )}
       </div>
 
       {/* Place Bid */}
@@ -141,7 +164,10 @@ export default function LotDetail() {
         />
       ) : (
         <div className="mb-8 p-4 bg-gray-100 rounded-lg text-gray-700">
-          <p>Auction closed. Winning bid: {lot.winningBid ? `₹${lot.winningBid.amount}` : "No bids placed"}</p>
+          <p>
+            Auction closed. Winning bid:{" "}
+            {lot.winningBid ? `₹${lot.winningBid.amount}` : "No bids placed"}
+          </p>
         </div>
       )}
 

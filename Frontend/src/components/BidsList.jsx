@@ -1,6 +1,6 @@
 // src/components/BidsList.jsx
 import { useState, useEffect } from "react";
-import api from "../api";
+import api from "../api/api";
 import { socket } from "../socket";
 
 const BidsList = ({ lotId, winningBidId }) => {
@@ -53,12 +53,20 @@ const BidsList = ({ lotId, winningBidId }) => {
             <li
               key={b._id}
               className={`flex justify-between items-center px-4 py-3 text-sm transition
-                ${isWinner ? "bg-yellow-100 border-l-4 border-yellow-500 font-bold" : "bg-white hover:bg-gray-50"}`}
+                ${
+                  isWinner
+                    ? "bg-yellow-100 border-l-4 border-yellow-500 font-bold"
+                    : "bg-white hover:bg-gray-50"
+                }`}
             >
               <span className="font-medium text-gray-700">
                 {b.bidder?.username || "Unknown"}
               </span>
-              <span className={`font-semibold ${isWinner ? "text-yellow-700" : "text-green-700"}`}>
+              <span
+                className={`font-semibold ${
+                  isWinner ? "text-yellow-700" : "text-green-700"
+                }`}
+              >
                 ₹{b.amount}
               </span>
               <span className="text-xs text-gray-500">

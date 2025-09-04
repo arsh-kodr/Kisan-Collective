@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import api from "../api";
+import api from "../api/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 
@@ -52,8 +52,12 @@ export default function Dashboard() {
             <div>
               {myLots.map((l) => (
                 <div key={l._id} className="bg-white p-2 my-2 rounded">
-                  <div>{l.name} — {l.status}</div>
-                  <Link to={`/lots/${l._id}`} className="text-blue-600 text-sm">View</Link>
+                  <div>
+                    {l.name} — {l.status}
+                  </div>
+                  <Link to={`/lots/${l._id}`} className="text-blue-600 text-sm">
+                    View
+                  </Link>
                 </div>
               ))}
               {myLots.length === 0 && <p>No lots created yet.</p>}

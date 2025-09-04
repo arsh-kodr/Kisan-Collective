@@ -1,28 +1,24 @@
-// src/controllers/listing.controller.js
 const Listing = require("../models/listing.model");
 const Lot = require("../models/lot.model");
 const User = require("../models/user.model");
 
-
+// Farmer creates new listing (default = pending)
 const createListing = async (req, res) => {
   try {
     const { crop, quantityKg, unit, harvestDate, mandiPriceAtEntry, expectedPricePerKg, location, photos } = req.body;
 
-    // Required fields validation
     if (!crop || !quantityKg || !harvestDate) {
       return res.status(400).json({ message: "Crop, quantity, and harvest date are required" });
     }
 
-    // Build listing object (only allowed fields)
     const listingData = {
       crop,
       quantityKg,
       harvestDate,
       createdBy: req.user.sub,
-      status: "open",
+      status: "pending", // ⬅️ FPO must approve before becoming open
     };
 
-    // Optional fields
     if (unit) listingData.unit = unit;
     if (mandiPriceAtEntry) listingData.mandiPriceAtEntry = mandiPriceAtEntry;
     if (expectedPricePerKg) listingData.expectedPricePerKg = expectedPricePerKg;
@@ -31,15 +27,14 @@ const createListing = async (req, res) => {
 
     const listing = await Listing.create(listingData);
 
-    res.status(201).json({ message: "Listing created successfully", listing });
+    res.status(201).json({ message: "Listing submitted for FPO approval", listing });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
-//  Get all listings (public or FPO)
+// Public / FPO view (only open listings)
 const getListings = async (req, res) => {
   try {
     const listings = await Listing.find({ status: "open" })
@@ -52,10 +47,11 @@ const getListings = async (req, res) => {
   }
 };
 
-//  Get listings by authenticated farmer
+// Farmer-only listings
 const getMyListings = async (req, res) => {
   try {
-    const listings = await Listing.find({ createdBy: req.user.sub }).populate("lot", "name status");
+    const listings = await Listing.find({ createdBy: req.user.sub })
+      .populate("lot", "name status");
     res.json({ listings });
   } catch (err) {
     console.error(err);
@@ -63,7 +59,7 @@ const getMyListings = async (req, res) => {
   }
 };
 
-//  Get single listing by ID
+// Single listing
 const getListingById = async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id)
@@ -78,13 +74,13 @@ const getListingById = async (req, res) => {
   }
 };
 
-//  Update listing (Farmer only)
+// Update listing (farmer only)
 const updateListing = async (req, res) => {
   try {
     const listing = await Listing.findOne({ _id: req.params.id, createdBy: req.user.sub });
     if (!listing) return res.status(404).json({ message: "Listing not found or unauthorized" });
 
-    const allowedFields = ["crop", "quantityKg", "unit", "harvestDate", "mandiPriceAtEntry", "expectedPricePerKg", "location", "photos", "status"];
+    const allowedFields = ["crop", "quantityKg", "unit", "harvestDate", "mandiPriceAtEntry", "expectedPricePerKg", "location", "photos"];
     const updates = {};
 
     allowedFields.forEach(field => {
@@ -101,13 +97,75 @@ const updateListing = async (req, res) => {
   }
 };
 
-//  Delete listing (Farmer only)
+// Delete listing (farmer only)
 const deleteListing = async (req, res) => {
   try {
     const listing = await Listing.findOneAndDelete({ _id: req.params.id, createdBy: req.user.sub });
     if (!listing) return res.status(404).json({ message: "Listing not found or unauthorized" });
 
     res.json({ message: "Listing deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Fetch open listings (filter support)
+const getOpenListings = async (req, res) => {
+  try {
+    const { crop, location, minQty, maxQty } = req.query;
+    const query = { status: "open" };
+
+    if (crop) query.crop = crop;
+    if (location) query.location = location;
+    if (minQty) query.quantityKg = { ...query.quantityKg, $gte: Number(minQty) };
+    if (maxQty) query.quantityKg = { ...query.quantityKg, $lte: Number(maxQty) };
+
+    const listings = await Listing.find(query).populate("createdBy", "username fullName");
+
+    res.json(listings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch open listings" });
+  }
+};
+
+// 🆕 FPO Approval controllers
+const getPendingListings = async (req, res) => {
+  try {
+    const listings = await Listing.find({ status: "pending" })
+      .populate("createdBy", "username fullName email");
+    res.json({ listings });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const approveListing = async (req, res) => {
+  try {
+    const listing = await Listing.findByIdAndUpdate(
+      req.params.id,
+      { status: "open" },
+      { new: true }
+    );
+    if (!listing) return res.status(404).json({ message: "Listing not found" });
+    res.json({ message: "Listing approved", listing });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const rejectListing = async (req, res) => {
+  try {
+    const listing = await Listing.findByIdAndUpdate(
+      req.params.id,
+      { status: "cancelled" },
+      { new: true }
+    );
+    if (!listing) return res.status(404).json({ message: "Listing not found" });
+    res.json({ message: "Listing rejected", listing });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -121,4 +179,8 @@ module.exports = {
   getListingById,
   updateListing,
   deleteListing,
+  getOpenListings,
+  getPendingListings, 
+  approveListing,     
+  rejectListing       
 };

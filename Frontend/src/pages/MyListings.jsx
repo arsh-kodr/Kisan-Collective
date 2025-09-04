@@ -1,6 +1,6 @@
 // src/pages/MyListings.jsx
 import React, { useEffect, useState } from "react";
-import api from "../api";
+import api from "../api/api";
 import ListingCard from "../components/ListingCard";
 import CreateListingForm from "../components/CreateListingForm";
 import EditListingModal from "../components/EditListingModal";
@@ -15,7 +15,9 @@ export default function MyListings() {
   const fetchMyListings = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/listings/me/listings", { withCredentials: true });
+      const res = await api.get("/listings/me/listings", {
+        withCredentials: true,
+      });
       setListings(res.data.listings || []);
     } catch (err) {
       console.error("Failed to load listings:", err);
@@ -36,7 +38,8 @@ export default function MyListings() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this listing?")) return;
+    if (!window.confirm("Are you sure you want to delete this listing?"))
+      return;
     try {
       await api.delete(`/listings/${id}`, { withCredentials: true });
       toast.success("Listing deleted");
@@ -62,7 +65,9 @@ export default function MyListings() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Listings</h1>
-          <p className="text-sm text-gray-600 mt-1">Create, edit and manage your produce listings.</p>
+          <p className="text-sm text-gray-600 mt-1">
+            Create, edit and manage your produce listings.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -91,12 +96,17 @@ export default function MyListings() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-lg p-4 shadow animate-pulse min-h-[140px]" />
+            <div
+              key={i}
+              className="bg-white rounded-lg p-4 shadow animate-pulse min-h-[140px]"
+            />
           ))}
         </div>
       ) : listings.length === 0 ? (
         <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-gray-600">You have no listings yet. Click create to add one.</p>
+          <p className="text-gray-600">
+            You have no listings yet. Click create to add one.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

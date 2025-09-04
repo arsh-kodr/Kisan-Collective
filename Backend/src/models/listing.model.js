@@ -10,7 +10,6 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // quantity in kilograms (you can change unit if needed)
     quantityKg: {
       type: Number,
       required: [true, "Quantity is required"],
@@ -28,21 +27,18 @@ const listingSchema = new mongoose.Schema(
       required: [true, "Harvest date is required"],
     },
 
-    // mandi price at time of entry (optional but useful)
     mandiPriceAtEntry: {
       type: Number,
       required: false,
       min: 0,
     },
 
-    // optional expected price set by farmer
     expectedPricePerKg: {
       type: Number,
       required: false,
       min: 0,
     },
 
-    // who created the listing (farmer)
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -50,14 +46,15 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // reference to a Lot if this listing is pooled into a lot
+    // reference to a Lot if this listing is pooled into one
     lot: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Lot",
       default: null,
+      index: true,
     },
 
-    // listing status lifecycle: pending -> open -> pooled -> sold -> cancelled
+    // lifecycle of listing
     status: {
       type: String,
       enum: ["pending", "open", "pooled", "sold", "cancelled"],
@@ -65,20 +62,18 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // optional location (village / mandi name / coords)
     location: {
       type: String,
       required: false,
       trim: true,
     },
 
-    // images / proofs — store S3/Cloudinary URLs
     photos: {
       type: [String],
       default: [],
     },
 
-    // any extra metadata
+    // metadata like grading, quality checks, etc.
     meta: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
@@ -89,10 +84,10 @@ const listingSchema = new mongoose.Schema(
   }
 );
 
-// Example compound index for quick queries (by farmer + status)
+// Compound index for faster dashboard queries
 listingSchema.index({ createdBy: 1, status: 1 });
-
-
+// Useful for FPO pooling dashboard (filter open listings quickly)
+listingSchema.index({ status: 1, crop: 1, location: 1 });
 
 const Listing = mongoose.model("Listing", listingSchema);
 module.exports = Listing;

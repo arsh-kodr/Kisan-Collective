@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import api from "../api";
+import api from "../api/api";
 import toast from "react-hot-toast";
 import { socket } from "../socket";
 
@@ -16,7 +16,9 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
     if (disabled) return;
     try {
       setFetchingHighest(true);
-      const res = await api.get(`/bids/lots/${lotId}/highest`, { withCredentials: true });
+      const res = await api.get(`/bids/lots/${lotId}/highest`, {
+        withCredentials: true,
+      });
       const newHighest = res.data.highestBid || null;
 
       if (
@@ -25,7 +27,9 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
         newHighest.amount > prevHighest.current.amount
       ) {
         toast.success(
-          `New highest bid: ₹${newHighest.amount} by ${newHighest.bidder?.username || "someone"}`
+          `New highest bid: ₹${newHighest.amount} by ${
+            newHighest.bidder?.username || "someone"
+          }`
         );
       }
 
@@ -98,7 +102,11 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
         ) : (
           <span className="text-sm text-gray-600">
             Current Highest:{" "}
-            <span className={`font-semibold ${isHighestBidder ? "text-blue-700" : "text-green-700"}`}>
+            <span
+              className={`font-semibold ${
+                isHighestBidder ? "text-blue-700" : "text-green-700"
+              }`}
+            >
               {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
               {isHighestBidder && " (You are highest bidder)"}
             </span>
@@ -115,7 +123,9 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Enter bid (min ₹${highestBid ? highestBid.amount + 1 : 1})`}
+          placeholder={`Enter bid (min ₹${
+            highestBid ? highestBid.amount + 1 : 1
+          })`}
           className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition"
           min={highestBid ? highestBid.amount + 1 : 1}
           required

@@ -1,6 +1,6 @@
 // src/pages/BrowseLots.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import api from "../api";
+import api from "../api/api";
 import LotCard from "../components/LotCard";
 import Pagination from "../components/Pagination";
 import useDebounce from "../hooks/useDebounce";

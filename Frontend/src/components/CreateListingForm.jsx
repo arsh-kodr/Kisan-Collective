@@ -1,6 +1,6 @@
 // src/components/CreateListingForm.jsx
 import { useState } from "react";
-import api from "../api";
+import api from "../api/api";
 
 const CreateListingForm = ({ onCreated }) => {
   const [form, setForm] = useState({
@@ -53,12 +53,16 @@ const CreateListingForm = ({ onCreated }) => {
 
   return (
     <div className="max-w-xl mx-auto p-6 bg-white rounded-2xl shadow-md">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Create New Listing</h2>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        Create New Listing
+      </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Crop */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Crop Name</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Crop Name
+          </label>
           <input
             type="text"
             name="crop"
@@ -72,7 +76,9 @@ const CreateListingForm = ({ onCreated }) => {
         {/* Quantity */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Quantity</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Quantity
+            </label>
             <input
               type="number"
               name="quantityKg"
@@ -83,7 +89,9 @@ const CreateListingForm = ({ onCreated }) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Unit</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Unit
+            </label>
             <select
               name="unit"
               value={form.unit}
@@ -99,7 +107,9 @@ const CreateListingForm = ({ onCreated }) => {
 
         {/* Harvest Date */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Harvest Date</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Harvest Date
+          </label>
           <input
             type="date"
             name="harvestDate"
@@ -113,7 +123,9 @@ const CreateListingForm = ({ onCreated }) => {
         {/* Prices */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Mandi Price (₹)</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Mandi Price (₹)
+            </label>
             <input
               type="number"
               name="mandiPriceAtEntry"
@@ -123,7 +135,9 @@ const CreateListingForm = ({ onCreated }) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Expected Price per Kg (₹)</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Expected Price per Kg (₹)
+            </label>
             <input
               type="number"
               name="expectedPricePerKg"
@@ -136,7 +150,9 @@ const CreateListingForm = ({ onCreated }) => {
 
         {/* Location */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Location</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Location
+          </label>
           <input
             type="text"
             name="location"
@@ -148,12 +164,16 @@ const CreateListingForm = ({ onCreated }) => {
 
         {/* Photos */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Photo (URL)</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Photo (URL)
+          </label>
           <input
             type="text"
             name="photos"
             value={form.photos[0]}
-            onChange={(e) => setForm((prev) => ({ ...prev, photos: [e.target.value] }))}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, photos: [e.target.value] }))
+            }
             className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>
