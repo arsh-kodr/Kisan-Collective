@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/api";
 import toast from "react-hot-toast";
 import { socket } from "../socket";
+import { motion } from "framer-motion";
 
 const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
   const [amount, setAmount] = useState("");
@@ -11,7 +12,7 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
   const [disabled, setDisabled] = useState(false);
   const prevHighest = useRef(null);
 
-  // Fetch the current highest bid
+  // Fetch current highest bid
   const fetchHighest = async () => {
     if (disabled) return;
     try {
@@ -21,6 +22,7 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
       });
       const newHighest = res.data.highestBid || null;
 
+      // Toast only if higher than previous
       if (
         newHighest &&
         prevHighest.current &&
@@ -50,16 +52,19 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
     return () => clearInterval(interval);
   }, [lotId, disabled]);
 
-  // Socket listener for auction end
+  // Socket listener for auction close
   useEffect(() => {
-    const handleLotEnded = (data) => {
-      if (data.lotId === lotId) {
-        setDisabled(true);
-        toast.error("Auction ended! You can no longer place bids.");
+    socket.on(`lot:closed:${lotId}`, ({ winningBid }) => {
+      setDisabled(true);
+      toast.error("Auction ended! You can no longer place bids.");
+      if (winningBid) {
+        setHighestBid(winningBid);
       }
+    });
+
+    return () => {
+      socket.off(`lot:closed:${lotId}`);
     };
-    socket.on("lot:ended", handleLotEnded);
-    return () => socket.off("lot:ended", handleLotEnded);
   }, [lotId]);
 
   const handleSubmit = async (e) => {
@@ -91,7 +96,12 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
   const isHighestBidder = highestBid?.bidder?._id === currentUserId;
 
   return (
-    <div className="border rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 shadow-md">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="border rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 shadow-md"
+    >
       {/* Header */}
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-lg font-semibold text-gray-800">Place a Bid</h3>
@@ -131,15 +141,17 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
           required
           disabled={loading || disabled}
         />
-        <button
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
           type="submit"
           disabled={loading || disabled}
           className="bg-green-600 text-white px-6 py-2 rounded-xl font-medium shadow hover:bg-green-700 active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? "Placing..." : disabled ? "Auction Ended" : "Place Bid"}
-        </button>
+        </motion.button>
       </form>
-    </div>
+    </motion.div>
   );
 };
 

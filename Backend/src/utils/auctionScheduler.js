@@ -1,13 +1,13 @@
 // utils/auctionScheduler.js
 const Lot = require("../models/lot.model");
 const Bid = require("../models/bid.model");
+const { getIO } = require("../config/socket");
 
 /**
  * Schedule auto-close for a lot
- * @param {Object} io - Socket.io instance
  * @param {Object} lot - Lot document
  */
-const scheduleLotClosure = (io, lot) => {
+const scheduleLotClosure = (lot) => {
   if (!lot.endTime || lot.status !== "open") return;
 
   const delay = new Date(lot.endTime) - Date.now();
@@ -20,12 +20,14 @@ const scheduleLotClosure = (io, lot) => {
       lot.winningBid = topBid?._id || null;
       await lot.save();
 
+      const io = getIO();
+
       // Notify all clients in this lot room
       io.to(`lot:${lot._id}`).emit(`lot:closed:${lot._id}`, {
         winningBid: topBid,
       });
 
-      // Notify frontend to disable bid form
+      // Notify globally (frontend dashboards, etc.)
       io.emit("lot:ended", { lotId: lot._id });
 
       console.log(`Lot ${lot._id} auto-closed`);

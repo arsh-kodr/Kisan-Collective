@@ -3,22 +3,56 @@ import api from "./api";
 
 const listingApi = {
   // Farmer Endpoints
-  getMyListings: () => api.get("/listings/me/listings"),
-  createListing: (data) => api.post("/listings", data),
-  updateListing: (id, data) => api.put(`/listings/${id}`, data),
-  deleteListing: (id) => api.delete(`/listings/${id}`),
+  getMyListings: async () => {
+    const res = await api.get("/listings/me/listings");
+    return res.data.listings || [];
+  },
+  createListing: async (data) => {
+    const res = await api.post("/listings", data);
+    return res.data.listing;
+  },
+  updateListing: async (id, data) => {
+    const res = await api.put(`/listings/${id}`, data);
+    return res.data.listing;
+  },
+  deleteListing: async (id) => {
+    const res = await api.delete(`/listings/${id}`);
+    return res.data;
+  },
 
   // Common (Farmer + FPO + Buyer)
-  getListings: () => api.get("/listings"),
-  getListingById: (id) => api.get(`/listings/${id}`),
+  getListings: async () => {
+    const res = await api.get("/listings");
+    return res.data.listings || [];
+  },
+  getListingById: async (id) => {
+    const res = await api.get(`/listings/${id}`);
+    return res.data.listing;
+  },
 
-  // alias for clarity
-  getOpenListings: () => api.get("/listings"),
+  // Alias for clarity
+  getOpenListings: async () => {
+    const res = await api.get("/listings/open");
+    return res.data || [];
+  },
 
   // FPO Endpoints
-  getPendingListings: () => api.get("/listings/pending"),
-  approveListing: (id) => api.put(`/listings/${id}/approve`),
-  rejectListing: (id) => api.put(`/listings/${id}/reject`),
+  getPendingListings: async () => {
+    const res = await api.get("/listings/pending");
+    return res.data.listings || [];
+  },
+  getFarmerListings: async (farmerId) => {
+    const res = await api.get(`/listings/farmer/${farmerId}`);
+    return res.data.listings || [];
+  },
+  approveListing: async (id) => {
+    const res = await api.put(`/listings/${id}/approve`);
+    return res.data.listing;
+  },
+  rejectListing: async (id) => {
+    const res = await api.put(`/listings/${id}/reject`);
+    return res.data.listing;
+  },
 };
 
 export default listingApi;

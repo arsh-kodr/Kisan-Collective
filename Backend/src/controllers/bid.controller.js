@@ -127,16 +127,16 @@ const getHighestBid = async (req, res) => {
  */
 const getMyBids = async (req, res) => {
   try {
-    const bids = await Bid.find({ bidder: req.user.sub })
-      .sort({ createdAt: -1 })
-      .populate("lot", "name status totalQuantity");
-    return res.json({ bids });
+    const bids = await Bid.find({ bidder: req.user.sub }) // ✅ FIXED
+      .populate("lot")
+      .sort({ createdAt: -1 });
+
+    res.json(bids);
   } catch (err) {
-    console.error("getMyBids error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("Error fetching my bids:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
-
 /**
  * GET /api/bids/lots/:lotId
  * Public or optional auth (depending on your route middleware)
@@ -144,22 +144,15 @@ const getMyBids = async (req, res) => {
 const getBidsForLot = async (req, res) => {
   try {
     const { lotId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(lotId))
-      return res.status(400).json({ message: "Invalid lotId" });
 
-    const lot = await Lot.findById(lotId);
-    if (!lot) return res.status(404).json({ message: "Lot not found" });
-
-    // Optional extra checks for req.user (if present)
-    // (your existing logic allowed public reads)
     const bids = await Bid.find({ lot: lotId })
-      .sort({ amount: -1, createdAt: -1 })
-      .populate("bidder", "username email");
+      .populate("bidder", "username email")
+      .sort({ createdAt: -1 });
 
-    return res.json({ bids });
+    res.json(bids);
   } catch (err) {
-    console.error("getBidsForLot error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("Error fetching bids:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 

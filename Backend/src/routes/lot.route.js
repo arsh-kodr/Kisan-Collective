@@ -7,23 +7,25 @@ const {
   getMyLots,
   closeLot,
   getLotById,
-  poolListingsIntoLot
-  
+  poolListingsIntoLot,
 } = require("../controllers/lot.controller");
 
 const router = express.Router();
 
-// 🔹 Public (guest or logged-in can view)
+// Public
 router.get("/", optionalAuthenticate, getLots);
-router.get("/:id", optionalAuthenticate, getLotById);
 
-// 🔹 FPO-only actions
-router.get("/me/lots", authenticate, authorize("fpo"), getMyLots);
+// FPO-only actions (specific routes first)
+router.get("/my-lots", authenticate, authorize("fpo"), getMyLots); // preferred
+router.get("/me/lots", authenticate, authorize("fpo"), getMyLots); // alias for backward compatibility
+
 router.post("/", authenticate, authorize("fpo"), createLot);
 router.post("/pool", authenticate, authorize("fpo"), poolListingsIntoLot);
 
-
-// 🔹 Close auction (FPO only)
+// Close auction (FPO only) - use named param
 router.post("/:lotId/close", authenticate, authorize("fpo"), closeLot);
+
+// Lot by id (catch-all) — must be last
+router.get("/:id", optionalAuthenticate, getLotById);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const Listing = require("../models/listing.model");
 const Lot = require("../models/lot.model");
 const User = require("../models/user.model");
+const mongoose = require("mongoose");
 
 // Farmer creates new listing (default = pending)
 const createListing = async (req, res) => {
@@ -62,7 +63,14 @@ const getMyListings = async (req, res) => {
 // Single listing
 const getListingById = async (req, res) => {
   try {
-    const listing = await Listing.findById(req.params.id)
+    const id = req.params.id;
+
+    // Defensive: ensure id is a valid ObjectId to avoid CastError
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid listing id" });
+    }
+
+    const listing = await Listing.findById(id)
       .populate("createdBy", "username fullName role")
       .populate("lot", "name status");
     if (!listing) return res.status(404).json({ message: "Listing not found" });
@@ -172,6 +180,23 @@ const rejectListing = async (req, res) => {
   }
 };
 
+// Get all listings of a specific farmer (FPO use case)
+const getFarmerListings = async (req, res) => {
+  try {
+    const farmerId = req.params.id;
+
+    const listings = await Listing.find({ createdBy: farmerId })
+      .populate("createdBy", "username fullName email")
+      .populate("lot", "name status");
+
+    res.json({ listings });
+  } catch (err) {
+    console.error("Error fetching farmer listings:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 module.exports = {
   createListing,
   getListings,
@@ -182,5 +207,6 @@ module.exports = {
   getOpenListings,
   getPendingListings, 
   approveListing,     
-  rejectListing       
+  rejectListing,
+  getFarmerListings    
 };
