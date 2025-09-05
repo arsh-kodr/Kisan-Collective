@@ -1,75 +1,48 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import api from "../api/api";
 import toast from "react-hot-toast";
 import { socket } from "../socket";
 import { motion } from "framer-motion";
 
-const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
+const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) => {
   const [amount, setAmount] = useState("");
   const [highestBid, setHighestBid] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [fetchingHighest, setFetchingHighest] = useState(true);
   const [disabled, setDisabled] = useState(false);
-  const prevHighest = useRef(null);
 
-  // Fetch current highest bid
-  const fetchHighest = async () => {
-    if (disabled) return;
-    try {
-      setFetchingHighest(true);
-      const res = await api.get(`/bids/lots/${lotId}/highest`, {
-        withCredentials: true,
-      });
-      const newHighest = res.data.highestBid || null;
-
-      // Toast only if higher than previous
-      if (
-        newHighest &&
-        prevHighest.current &&
-        newHighest.amount > prevHighest.current.amount
-      ) {
-        toast.success(
-          `New highest bid: ₹${newHighest.amount} by ${
-            newHighest.bidder?.username || "someone"
-          }`
-        );
+  // Listen for new bids and auction closure
+  useEffect(() => {
+    const handleNewBid = ({ bid }) => {
+      if (!highestBid || bid.amount > highestBid.amount) {
+        setHighestBid(bid);
+        toast.success(`New highest bid: ₹${bid.amount} by ${bid.bidder?.username || "someone"}`);
       }
+    };
 
-      setHighestBid(newHighest);
-      prevHighest.current = newHighest;
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch highest bid");
-    } finally {
-      setFetchingHighest(false);
-    }
-  };
-
-  // Poll highest bid every 8s
-  useEffect(() => {
-    fetchHighest();
-    const interval = setInterval(fetchHighest, 8000);
-    return () => clearInterval(interval);
-  }, [lotId, disabled]);
-
-  // Socket listener for auction close
-  useEffect(() => {
-    socket.on(`lot:closed:${lotId}`, ({ winningBid }) => {
+    const handleLotClosed = ({ winningBid }) => {
       setDisabled(true);
       toast.error("Auction ended! You can no longer place bids.");
-      if (winningBid) {
-        setHighestBid(winningBid);
-      }
-    });
+      if (winningBid) setHighestBid(winningBid);
+    };
+
+    socket.on(`bid:new:${lotId}`, handleNewBid);
+    socket.on(`lot:closed:${lotId}`, handleLotClosed);
 
     return () => {
-      socket.off(`lot:closed:${lotId}`);
+      socket.off(`bid:new:${lotId}`, handleNewBid);
+      socket.off(`lot:closed:${lotId}`, handleLotClosed);
     };
-  }, [lotId]);
+  }, [lotId, highestBid]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (disabled) return;
+
+    const minBid = Math.max(highestBid?.amount + 1 || 1, lotBasePrice);
+    if (Number(amount) < minBid) {
+      toast.error(`Bid must be at least ₹${minBid}`);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -81,7 +54,6 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
       const newBid = res.data.bid;
       setAmount("");
       setHighestBid(newBid);
-      prevHighest.current = newBid;
       onBidPlaced?.(newBid);
 
       toast.success("✅ Bid placed successfully!");
@@ -103,25 +75,15 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
       className="border rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 shadow-md"
     >
       {/* Header */}
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-800">Place a Bid</h3>
-        {fetchingHighest ? (
-          <span className="text-sm text-gray-500 animate-pulse">
-            Checking highest bid...
+        <span className="text-sm text-gray-600">
+          Current Highest:{" "}
+          <span className={`font-semibold ${isHighestBidder ? "text-blue-700" : "text-green-700"}`}>
+            {highestBid ? `₹${highestBid.amount}` : `Min ₹${lotBasePrice}`}
+            {isHighestBidder && " (You are highest bidder)"}
           </span>
-        ) : (
-          <span className="text-sm text-gray-600">
-            Current Highest:{" "}
-            <span
-              className={`font-semibold ${
-                isHighestBidder ? "text-blue-700" : "text-green-700"
-              }`}
-            >
-              {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
-              {isHighestBidder && " (You are highest bidder)"}
-            </span>
-          </span>
-        )}
+        </span>
       </div>
 
       {/* Form */}
@@ -133,11 +95,9 @@ const PlaceBidForm = ({ lotId, onBidPlaced, currentUserId }) => {
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Enter bid (min ₹${
-            highestBid ? highestBid.amount + 1 : 1
-          })`}
+          placeholder={`Enter bid (min ₹${Math.max(highestBid?.amount + 1 || 1, lotBasePrice)})`}
           className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-          min={highestBid ? highestBid.amount + 1 : 1}
+          min={Math.max(highestBid?.amount + 1 || 1, lotBasePrice)}
           required
           disabled={loading || disabled}
         />

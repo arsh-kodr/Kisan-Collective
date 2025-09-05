@@ -8,6 +8,8 @@ const lotRoutes = require("./lot.route")
 const bidRoutes = require("./bid.route");  
 const paymentRoutes = require("./payment.route");
 const fpoRoutes = require("./fpo.route");
+const orderRoutes = require("./order.routes");
+
 
 const router = express.Router();
 
@@ -20,6 +22,8 @@ router.use("/lots" , lotRoutes);
 router.use("/bids", bidRoutes);    
 router.use("/payments", paymentRoutes);
 router.use("/fpo", fpoRoutes);
+router.use("/orders", orderRoutes);
+
 
 
 module.exports = router;

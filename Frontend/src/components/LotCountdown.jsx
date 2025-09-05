@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { socket } from "../socket";
 
-export default function LotCountdown({ lotId, endTime, onEnd }) {
+export default function LotCountdownBar({ lotId, endTime, onEnd }) {
   const [timeLeft, setTimeLeft] = useState(Math.max(new Date(endTime) - new Date(), 0));
-  const [ended, setEnded] = useState(false); // to prevent multiple emits
+  const [ended, setEnded] = useState(false);
 
   useEffect(() => {
     if (ended) return;
@@ -14,27 +15,51 @@ export default function LotCountdown({ lotId, endTime, onEnd }) {
 
       if (diff <= 0) {
         clearInterval(interval);
-        setEnded(true); // mark as ended
-
-        onEnd?.(); // callback to update UI
-
-        // Emit socket event only once
-        if (lotId) {
-          socket.emit("lot:ended", { lotId });
-        }
+        setEnded(true);
+        onEnd?.();
+        if (lotId) socket.emit("lot:ended", { lotId });
       }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [endTime, onEnd, lotId, ended]);
 
-  if (timeLeft <= 0) {
-    return <span className="text-red-600 font-semibold">Auction ended</span>;
-  }
+  const totalDuration = new Date(endTime) - new Date();
+  const percentLeft = Math.max(timeLeft / totalDuration, 0);
 
-  const hours = String(Math.floor(timeLeft / (1000 * 60 * 60))).padStart(2, "0");
-  const minutes = String(Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, "0");
-  const seconds = String(Math.floor((timeLeft % (1000 * 60)) / 1000)).padStart(2, "0");
+  // Determine color dynamically
+  let bgColor = "bg-green-500";
+  if (percentLeft < 0.3) bgColor = "bg-red-500";
+  else if (percentLeft < 0.6) bgColor = "bg-yellow-500";
 
-  return <span className="text-green-700 font-semibold">{hours}:{minutes}:{seconds}</span>;
+  // Time label
+  const hours = Math.floor(timeLeft / 3600000);
+  const minutes = Math.floor((timeLeft % 3600000) / 60000);
+  const seconds = Math.floor((timeLeft % 60000) / 1000);
+
+  const timeLabel =
+    hours > 0
+      ? `${hours}h ${minutes}m ${seconds}s`
+      : minutes > 0
+      ? `${minutes}m ${seconds}s`
+      : `${seconds}s`;
+
+  return (
+    <div className="w-full flex flex-col gap-1">
+      <div className="flex justify-between items-center text-sm font-medium text-gray-700">
+        <span>Time Left:</span>
+        <span className={`${percentLeft <= 0.3 ? "text-red-600" : percentLeft <= 0.6 ? "text-yellow-600" : "text-green-600"}`}>
+          {timeLabel}
+        </span>
+      </div>
+      <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+        <motion.div
+          className={`h-3 rounded-full ${bgColor}`}
+          initial={{ width: "100%" }}
+          animate={{ width: `${percentLeft * 100}%` }}
+          transition={{ ease: "linear", duration: 1 }}
+        />
+      </div>
+    </div>
+  );
 }

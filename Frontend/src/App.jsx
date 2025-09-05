@@ -7,7 +7,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Lots from "./pages/BrowseLots";
 import LotDetail from "./pages/LotDetail";
-import Orders from "./pages/Orders";
+import Orders from "./pages/Orders"; // legacy orders page
+import MyOrders from "./pages/MyOrders"; // buyer-specific dashboard
 import ProtectedRoute from "./components/ProtectedRoute";
 import FarmerListings from "./pages/FarmerListings";
 import FpoDashboard from "./components/fpo/Dashboard";
@@ -38,11 +39,13 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Buyer-only routes */}
           <Route
             path="/orders"
             element={
-              <ProtectedRoute>
-                <Orders />
+              <ProtectedRoute roles={["buyer"]}>
+                <MyOrders /> {/* Only buyers can see their orders */}
               </ProtectedRoute>
             }
           />

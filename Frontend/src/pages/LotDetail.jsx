@@ -4,17 +4,20 @@ import api from "../api/api";
 import { socket } from "../socket";
 import PlaceBidForm from "../components/PlaceBidForm";
 import BidsList from "../components/BidsList";
-import LotCountdown from "../components/LotCountdown";
+import LotCountdownBar from "../components/LotCountdown";
 import { AuthContext } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 
 export default function LotDetail() {
   const { id } = useParams();
   const { user } = useContext(AuthContext);
+
   const [lot, setLot] = useState(null);
   const [highestBid, setHighestBid] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch lot details
   const fetchLot = async () => {
     try {
       setLoading(true);
@@ -24,8 +27,7 @@ export default function LotDetail() {
       setError(null);
     } catch (err) {
       console.error(err);
-      if (err.response?.status === 404) setError("Lot not found");
-      else setError("Something went wrong. Please try again.");
+      setError(err.response?.status === 404 ? "Lot not found" : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -34,19 +36,24 @@ export default function LotDetail() {
   useEffect(() => {
     fetchLot();
 
-    // join socket room
+    // Join socket room for real-time updates
     socket.emit("join:lot", id);
 
-    // listen for new bids
+    // Listen for new bids
     socket.on(`bid:new:${id}`, (bid) => setHighestBid(bid));
 
-    // listen for auction closed
+    // Listen for auction closed
     socket.on(`lot:closed:${id}`, (data) => {
       setLot((prev) => ({
         ...prev,
         status: "closed",
         winningBid: data.winningBid,
       }));
+
+      // Notify user if they won
+      if (data.winningBid?.bidder?._id === user?._id) {
+        toast.success("🎉 You won this auction! Pay now to confirm your order.");
+      }
     });
 
     return () => {
@@ -54,7 +61,7 @@ export default function LotDetail() {
       socket.off(`bid:new:${id}`);
       socket.off(`lot:closed:${id}`);
     };
-  }, [id]);
+  }, [id, user]);
 
   if (loading)
     return (
@@ -77,35 +84,28 @@ export default function LotDetail() {
   const isHighestBidder = highestBid?.bidder?._id === user?._id;
 
   return (
-    <div className="max-w-3xl mx-auto bg-white shadow rounded-2xl p-6 md:p-10">
+    <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-2xl p-6 md:p-10 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-          {lot?.name}
-        </h2>
+      <div className="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 mb-6 gap-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">{lot?.name}</h2>
+
         <span
-          className={`mt-2 md:mt-0 px-3 py-1 text-sm rounded-full font-medium ${
-            lot?.status === "open"
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-200 text-gray-600"
+          className={`px-3 py-1 text-sm rounded-full font-medium ${
+            lot?.status === "open" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
           }`}
         >
           {lot?.status?.toUpperCase()}
         </span>
-        <div className="flex items-center gap-4">
-          {lot.status === "open" && lot.endTime && (
-            <LotCountdown
-              endTime={lot.endTime}
-              onEnd={() => setLot((prev) => ({ ...prev, status: "closed" }))}
-            />
-          )}
-          {isHighestBidder && !isClosed && (
-            <span className="ml-2 text-blue-700 font-semibold">
-              You are the highest bidder
-            </span>
-          )}
-        </div>
       </div>
+
+      {/* Countdown / Timer */}
+      {lot.status === "open" && lot.endTime && (
+        <LotCountdownBar
+          lotId={id}
+          endTime={lot.endTime}
+          onEnd={() => setLot((prev) => ({ ...prev, status: "closed" }))}
+        />
+      )}
 
       {/* Info Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -119,30 +119,21 @@ export default function LotDetail() {
         </div>
         <div>
           <p className="text-sm text-gray-500">FPO</p>
-          <p className="font-semibold text-gray-800">
-            {lot?.fpo?.username || "Unknown"}
-          </p>
+          <p className="font-semibold text-gray-800">{lot?.fpo?.username || "Unknown"}</p>
         </div>
         <div>
           <p className="text-sm text-gray-500">Current Highest Bid</p>
-          <p className="font-semibold text-gray-800">
-            {highestBid ? `₹${highestBid.amount}` : "No bids yet"}
-          </p>
+          <p className="font-semibold text-gray-800">{highestBid ? `₹${highestBid.amount}` : "No bids yet"}</p>
         </div>
       </div>
 
       {/* Listings */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Listings in this Lot
-        </h3>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Listings in this Lot</h3>
         {lot?.listings?.length > 0 ? (
           <ul className="space-y-2">
             {lot.listings.map((listing) => (
-              <li
-                key={listing._id}
-                className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between"
-              >
+              <li key={listing._id} className="border rounded-lg p-3 text-sm text-gray-700 flex justify-between">
                 <span>
                   {listing.crop} - {listing.quantityKg} {listing.unit}
                 </span>
@@ -159,15 +150,13 @@ export default function LotDetail() {
       {!isClosed ? (
         <PlaceBidForm
           lotId={id}
+          lotBasePrice={lot?.basePrice}
           onBidPlaced={(newBid) => setHighestBid(newBid)}
           currentUserId={user?._id}
         />
       ) : (
         <div className="mb-8 p-4 bg-gray-100 rounded-lg text-gray-700">
-          <p>
-            Auction closed. Winning bid:{" "}
-            {lot.winningBid ? `₹${lot.winningBid.amount}` : "No bids placed"}
-          </p>
+          <p>Auction closed. Winning bid: {lot.winningBid ? `₹${lot.winningBid.amount}` : "No bids placed"}</p>
         </div>
       )}
 
