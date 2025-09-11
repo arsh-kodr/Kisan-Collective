@@ -1,4 +1,3 @@
-// src/controllers/bid.controller.js
 const mongoose = require("mongoose");
 const Bid = require("../models/bid.model");
 const Lot = require("../models/lot.model");
@@ -13,9 +12,7 @@ const placeBid = async (req, res) => {
     const { lotId, amount } = req.body;
 
     if (!lotId || typeof amount === "undefined")
-      return res
-        .status(400)
-        .json({ message: "lotId and amount are required" });
+      return res.status(400).json({ message: "lotId and amount are required" });
 
     if (!mongoose.Types.ObjectId.isValid(lotId))
       return res.status(400).json({ message: "Invalid lotId" });
@@ -48,49 +45,27 @@ const placeBid = async (req, res) => {
     }
 
     // Create bid
-    const bid = await Bid.create({
+    let bid = await Bid.create({
       lot: lotId,
       bidder: req.user.sub,
       amount: numericAmount,
-      meta: {
-        placedByUsername: req.user?.username || null,
-      },
+      meta: { placedByUsername: req.user?.username || null },
     });
 
-    // Emit socket.io event so clients can update in real-time
+    // Populate bidder before sending response
+    bid = await bid.populate("bidder", "username email");
+
+    // Emit socket.io events
     try {
       const io = req.app.get("io");
       if (io) {
-        // emit to lot room (preferred)
-        io.to(`lot:${lotId}`).emit(`bid:new:${lotId}`, {
-          bid: {
-            _id: bid._id,
-            amount: bid.amount,
-            createdAt: bid.createdAt,
-            bidder: {
-              _id: req.user.sub,
-              username: req.user.username,
-            },
-          },
-          lotId,
-        });
+        const payload = { bid, lotId };
 
-        // global broadcast (optional) for admin monitor dashboards
-        io.emit("bid:new", {
-          bid: {
-            _id: bid._id,
-            amount: bid.amount,
-            createdAt: bid.createdAt,
-            bidder: {
-              _id: req.user.sub,
-              username: req.user.username,
-            },
-          },
-          lotId,
-        });
+        io.to(`lot:${lotId}`).emit(`bid:new:${lotId}`, payload);
+        io.emit("bid:new", payload); // optional global broadcast
       }
     } catch (emitErr) {
-      console.error("Socket emit error:", emitErr); // do not fail the request for socket errors
+      console.error("Socket emit error:", emitErr);
     }
 
     return res.status(201).json({ message: "Bid placed successfully", bid });
@@ -102,7 +77,6 @@ const placeBid = async (req, res) => {
 
 /**
  * GET /api/bids/lots/:lotId/highest
- * Public - returns single highest bid or null
  */
 const getHighestBid = async (req, res) => {
   try {
@@ -123,42 +97,47 @@ const getHighestBid = async (req, res) => {
 
 /**
  * GET /api/bids/my-bids
- * Auth: buyer
  */
 const getMyBids = async (req, res) => {
   try {
-    const bids = await Bid.find({ bidder: req.user.sub }) // ✅ FIXED
+    const bids = await Bid.find({ bidder: req.user.sub })
       .populate("lot")
-      .sort({ createdAt: -1 });
-
-    res.json(bids);
-  } catch (err) {
-    console.error("Error fetching my bids:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-/**
- * GET /api/bids/lots/:lotId
- * Public or optional auth (depending on your route middleware)
- */
-const getBidsForLot = async (req, res) => {
-  try {
-    const { lotId } = req.params;
-
-    const bids = await Bid.find({ lot: lotId })
       .populate("bidder", "username email")
       .sort({ createdAt: -1 });
 
     res.json(bids);
   } catch (err) {
-    console.error("Error fetching bids:", err);
+    console.error("getMyBids error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * GET /api/bids/lots/:lotId
+ * Returns all bids for a specific lot + lot info
+ */
+const getBidsForLot = async (req, res) => {
+  try {
+    const { lotId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(lotId))
+      return res.status(400).json({ message: "Invalid lotId" });
+
+    const lot = await Lot.findById(lotId);
+    if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+    const bids = await Bid.find({ lot: lotId })
+      .populate("bidder", "username email")
+      .sort({ amount: -1, createdAt: 1 }); // highest first
+
+    res.json({ lot, bids });
+  } catch (err) {
+    console.error("getBidsForLot error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 /**
  * POST /api/bids/lots/:lotId/close
- * Auth: FPO owner or admin
  */
 const closeAuction = async (req, res) => {
   try {
@@ -175,25 +154,18 @@ const closeAuction = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const winningBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 });
+    const winningBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 }).populate("bidder", "username email");
     if (!winningBid) return res.status(400).json({ message: "No bids to close" });
 
     lot.status = "sold";
     lot.winningBid = winningBid._id;
     await lot.save();
 
-    // emit auction closed event (optional)
+    // Emit socket event
     try {
       const io = req.app.get("io");
       if (io) {
-        io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, {
-          lotId,
-          winningBid: {
-            _id: winningBid._id,
-            amount: winningBid.amount,
-            bidder: winningBid.bidder,
-          },
-        });
+        io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, { lotId, winningBid });
         io.emit("lot:closed", { lotId, winningBid: winningBid._id });
       }
     } catch (emitErr) {

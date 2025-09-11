@@ -6,31 +6,61 @@ const mongoose = require("mongoose");
 // Farmer creates new listing (default = pending)
 const createListing = async (req, res) => {
   try {
-    const { crop, quantityKg, unit, harvestDate, mandiPriceAtEntry, expectedPricePerKg, location, photos } = req.body;
+    const {
+      crop,
+      quantityKg,
+      unit = "kg",
+      harvestDate,
+      mandiPriceAtEntry,
+      expectedPricePerKg,
+      location,
+      photos,
+    } = req.body;
 
-    if (!crop || !quantityKg || !harvestDate) {
-      return res.status(400).json({ message: "Crop, quantity, and harvest date are required" });
+    if (!crop || !quantityKg || !harvestDate || !expectedPricePerKg) {
+      return res.status(400).json({
+        message: "Crop, quantity, harvest date, and expected price per kg are required",
+      });
     }
+
+    const quantity = Number(quantityKg);
+    const pricePerKg = Number(expectedPricePerKg);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity must be a positive number" });
+    }
+    if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) {
+      return res.status(400).json({ message: "Expected price per kg must be positive" });
+    }
+
+    const harvest = new Date(harvestDate);
+    const today = new Date();
+    if (harvest > today) {
+      return res
+        .status(400)
+        .json({ message: "Harvest date must not be later than today" });
+    }
+
+    const basePrice = quantity * pricePerKg;
 
     const listingData = {
       crop,
-      quantityKg,
-      harvestDate,
+      quantityKg: quantity,
+      unit,
+      harvestDate: harvest,
+      mandiPriceAtEntry: mandiPriceAtEntry ? Number(mandiPriceAtEntry) : undefined,
+      expectedPricePerKg: pricePerKg,
+      basePrice,
+      location,
+      photos: photos || [],
       createdBy: req.user.sub,
-      status: "pending", // ⬅️ FPO must approve before becoming open
+      status: "pending", // FPO must approve before it becomes open
     };
-
-    if (unit) listingData.unit = unit;
-    if (mandiPriceAtEntry) listingData.mandiPriceAtEntry = mandiPriceAtEntry;
-    if (expectedPricePerKg) listingData.expectedPricePerKg = expectedPricePerKg;
-    if (location) listingData.location = location;
-    if (photos) listingData.photos = photos;
 
     const listing = await Listing.create(listingData);
 
     res.status(201).json({ message: "Listing submitted for FPO approval", listing });
   } catch (err) {
-    console.error(err);
+    console.error("createListing error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

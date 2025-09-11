@@ -46,7 +46,6 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // reference to a Lot if this listing is pooled into one
     lot: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Lot",
@@ -54,7 +53,6 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // lifecycle of listing
     status: {
       type: String,
       enum: ["pending", "open", "pooled", "sold", "cancelled"],
@@ -73,20 +71,16 @@ const listingSchema = new mongoose.Schema(
       default: [],
     },
 
-    // metadata like grading, quality checks, etc.
     meta: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Compound index for faster dashboard queries
+// Indexes
 listingSchema.index({ createdBy: 1, status: 1 });
-// Useful for FPO pooling dashboard (filter open listings quickly)
 listingSchema.index({ status: 1, crop: 1, location: 1 });
 
 const Listing = mongoose.model("Listing", listingSchema);

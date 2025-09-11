@@ -6,6 +6,12 @@ import lotApi from "../../api/lotApi";
 import listingApi from "../../api/listing";
 import toast from "react-hot-toast";
 
+const UNIT_CONVERSION = {
+  kg: 1,
+  quintal: 100,
+  tonne: 1000,
+};
+
 const CreateLotModal = ({ onClose }) => {
   const [name, setName] = useState("");
   const [basePrice, setBasePrice] = useState("");
@@ -14,10 +20,10 @@ const CreateLotModal = ({ onClose }) => {
   const [selectedListings, setSelectedListings] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Load approved listings
+  // ✅ Load available listings
   const fetchListings = async () => {
     try {
-      const res = await listingApi.getListings(); // approved + open listings
+      const res = await listingApi.getListings();
       setListings(Array.isArray(res) ? res : []);
     } catch (err) {
       console.error("Failed to load listings:", err);
@@ -29,6 +35,36 @@ const CreateLotModal = ({ onClose }) => {
     fetchListings();
   }, []);
 
+  // ✅ Auto-calculate base price when selected listings change
+  useEffect(() => {
+    if (selectedListings.length === 0) {
+      setBasePrice("");
+      return;
+    }
+
+    let totalValue = 0;
+    let totalQty = 0;
+
+    selectedListings.forEach((id) => {
+      const listing = listings.find((l) => l._id === id);
+      if (listing) {
+        const qtyInKg = listing.quantityKg * (UNIT_CONVERSION[listing.unit] || 1);
+
+        // pick expectedPricePerKg > mandiPriceAtEntry > 0
+        const pricePerKg =
+          listing.expectedPricePerKg ||
+          listing.mandiPriceAtEntry ||
+          0;
+
+        totalValue += pricePerKg * qtyInKg;
+        totalQty += qtyInKg;
+      }
+    });
+
+    const avgPrice = totalQty > 0 ? Math.round(totalValue / totalQty) : 0;
+    setBasePrice(avgPrice);
+  }, [selectedListings, listings]);
+
   // ✅ Submit lot
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,8 +73,8 @@ const CreateLotModal = ({ onClose }) => {
     try {
       const newLot = await lotApi.createLot({
         name,
-        basePrice,
-        endTime: autoCloseTime, // backend expects endTime
+        basePrice: Number(basePrice),
+        endTime: autoCloseTime,
         listings: selectedListings,
       });
 
@@ -109,7 +145,7 @@ const CreateLotModal = ({ onClose }) => {
             {/* Base Price */}
             <div>
               <label className="block text-sm font-medium text-gray-600">
-                Base Price (₹)
+                Base Price (₹ per kg)
               </label>
               <input
                 type="number"
@@ -117,8 +153,11 @@ const CreateLotModal = ({ onClose }) => {
                 onChange={(e) => setBasePrice(e.target.value)}
                 required
                 className="w-full border rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Enter minimum bid price"
+                placeholder="Auto-calculated from selected listings"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-calculated weighted average, but you can adjust manually.
+              </p>
             </div>
 
             {/* Auto Close Time */}
@@ -157,7 +196,7 @@ const CreateLotModal = ({ onClose }) => {
                         onChange={() => toggleListingSelection(listing._id)}
                       />
                       <span className="text-sm text-gray-700">
-                        {listing.crop} – {listing.quantityKg} kg
+                        {listing.crop} – {listing.quantityKg} {listing.unit}
                       </span>
                     </label>
                   ))

@@ -14,6 +14,8 @@ const router = express.Router();
 router.post("/place-bid", authenticate, authorize("buyer"), placeBid);
 router.get("/my-bids", authenticate, authorize("buyer"), getMyBids);
 
+// jo ek particular lot ke bids dekhna chahta hai
+
 // Public routes (optional auth)
 router.get("/lots/:lotId/highest", optionalAuthenticate, getHighestBid);
 router.get("/lots/:lotId", optionalAuthenticate, getBidsForLot);

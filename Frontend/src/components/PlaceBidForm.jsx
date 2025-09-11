@@ -1,17 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../api/api";
 import toast from "react-hot-toast";
 import { socket } from "../socket";
 import { motion } from "framer-motion";
 
-const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) => {
+const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
   const [amount, setAmount] = useState("");
   const [highestBid, setHighestBid] = useState(null);
+  const [lot, setLot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [disabled, setDisabled] = useState(false);
 
-  // Listen for new bids and auction closure
+  const fetchLotAndBids = async () => {
+    try {
+      const res = await api.get(`/bids/lots/${lotId}`, { withCredentials: true });
+      if (res.data?.lot) setLot(res.data.lot);
+
+      const bids = res.data?.bids ?? [];
+      if (bids.length > 0) {
+        const sorted = bids.sort((a, b) => b.amount - a.amount);
+        setHighestBid(sorted[0]);
+      }
+
+      const closed = res.data?.lot?.status === "closed" || res.data?.lot?.status === "sold";
+      setDisabled(closed);
+      onLotUpdate?.({ lot: res.data.lot, closed });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
+    fetchLotAndBids();
+
     const handleNewBid = ({ bid }) => {
       if (!highestBid || bid.amount > highestBid.amount) {
         setHighestBid(bid);
@@ -23,6 +44,7 @@ const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) =
       setDisabled(true);
       toast.error("Auction ended! You can no longer place bids.");
       if (winningBid) setHighestBid(winningBid);
+      onLotUpdate?.({ lot, closed: true });
     };
 
     socket.on(`bid:new:${lotId}`, handleNewBid);
@@ -34,13 +56,19 @@ const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) =
     };
   }, [lotId, highestBid]);
 
+  const minNextBid = useMemo(() => {
+    if (!lot) return 0;
+    const lotMin = lot.totalQuantity * lot.basePrice;
+    return highestBid?.amount ? Math.max(lotMin, highestBid.amount + 1) : lotMin;
+  }, [lot, highestBid]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (disabled) return;
 
-    const minBid = Math.max(highestBid?.amount + 1 || 1, lotBasePrice);
-    if (Number(amount) < minBid) {
-      toast.error(`Bid must be at least ₹${minBid}`);
+    const bidAmount = Number(amount);
+    if (isNaN(bidAmount) || bidAmount < minNextBid) {
+      toast.error(`Bid must be at least ₹${minNextBid}`);
       return;
     }
 
@@ -48,15 +76,14 @@ const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) =
     try {
       const res = await api.post(
         "/bids/place-bid",
-        { lotId, amount: Number(amount) },
+        { lotId, amount: bidAmount },
         { withCredentials: true }
       );
       const newBid = res.data.bid;
       setAmount("");
       setHighestBid(newBid);
       onBidPlaced?.(newBid);
-
-      toast.success("✅ Bid placed successfully!");
+      toast.success("Bid placed successfully!");
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || "Failed to place bid");
@@ -74,30 +101,25 @@ const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) =
       transition={{ duration: 0.3 }}
       className="border rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 shadow-md"
     >
-      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-800">Place a Bid</h3>
         <span className="text-sm text-gray-600">
           Current Highest:{" "}
           <span className={`font-semibold ${isHighestBidder ? "text-blue-700" : "text-green-700"}`}>
-            {highestBid ? `₹${highestBid.amount}` : `Min ₹${lotBasePrice}`}
+            {highestBid ? `₹${highestBid.amount}` : `Min ₹${lot ? lot.totalQuantity * lot.basePrice : 0}`}
             {isHighestBidder && " (You are highest bidder)"}
           </span>
         </span>
       </div>
 
-      {/* Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col sm:flex-row gap-3 sm:items-center"
-      >
+      <form className="flex flex-col sm:flex-row gap-3 sm:items-center" onSubmit={handleSubmit}>
         <input
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Enter bid (min ₹${Math.max(highestBid?.amount + 1 || 1, lotBasePrice)})`}
+          placeholder={`Enter bid (min ₹${minNextBid})`}
           className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-          min={Math.max(highestBid?.amount + 1 || 1, lotBasePrice)}
+          min={minNextBid}
           required
           disabled={loading || disabled}
         />
@@ -105,7 +127,7 @@ const PlaceBidForm = ({ lotId, lotBasePrice = 0, onBidPlaced, currentUserId }) =
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.05 }}
           type="submit"
-          disabled={loading || disabled}
+          disabled={loading || disabled || Number(amount) < minNextBid}
           className="bg-green-600 text-white px-6 py-2 rounded-xl font-medium shadow hover:bg-green-700 active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? "Placing..." : disabled ? "Auction Ended" : "Place Bid"}

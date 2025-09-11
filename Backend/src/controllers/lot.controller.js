@@ -1,3 +1,4 @@
+// src/controllers/lot.controller.js
 const Lot = require("../models/lot.model");
 const Listing = require("../models/listing.model");
 const Bid = require("../models/bid.model");
@@ -21,6 +22,7 @@ const createLot = async (req, res) => {
     if (!Array.isArray(listingIds) || listingIds.length === 0)
       return res.status(400).json({ message: "Select at least one listing" });
 
+    // ✅ Fetch listings (only open + not pooled)
     const listings = await Listing.find({
       _id: { $in: listingIds },
       status: "open",
@@ -28,37 +30,72 @@ const createLot = async (req, res) => {
     });
 
     if (listings.length !== listingIds.length) {
-      return res.status(400).json({ message: "Some listings are invalid or already pooled" });
+      return res
+        .status(400)
+        .json({ message: "Some listings are invalid or already pooled" });
     }
 
-    const totalQuantity = listings.reduce((sum, l) => sum + (l.quantityKg || 0), 0);
+    // ✅ Calculate weighted average base price
+    const UNIT_CONVERSION = { kg: 1, quintal: 100, tonne: 1000 };
 
+    let totalValue = 0;
+    let totalQty = 0;
+
+    listings.forEach((l) => {
+      const qtyInKg = (l.quantityKg || 0) * (UNIT_CONVERSION[l.unit] || 1);
+      const pricePerKg =
+        l.expectedPricePerKg || l.mandiPriceAtEntry || 0;
+
+      totalValue += pricePerKg * qtyInKg;
+      totalQty += qtyInKg;
+    });
+
+    const calculatedBasePrice =
+      totalQty > 0 ? Math.round(totalValue / totalQty) : 0;
+
+    const finalBasePrice = basePrice
+      ? Number(basePrice)
+      : calculatedBasePrice;
+
+    // ✅ Total quantity in kg (normalized)
+    const totalQuantity = listings.reduce(
+      (sum, l) =>
+        sum + (l.quantityKg || 0) * (UNIT_CONVERSION[l.unit] || 1),
+      0
+    );
+
+    // ✅ Create Lot
     const lot = await Lot.create({
       name,
       listings: listings.map((l) => l._id),
       fpo: req.user.sub,
       totalQuantity,
-      basePrice: basePrice || 0,
+      basePrice: finalBasePrice,
       endTime: endTime ? new Date(endTime) : undefined,
       status: "open",
+      winningBid: null,
     });
 
-    // Mark listings as pooled
+    // ✅ Mark listings as pooled
     await Listing.updateMany(
       { _id: { $in: listings.map((l) => l._id) } },
       { $set: { status: "pooled", lot: lot._id } }
     );
 
-    // Notify via socket
+    // ✅ Notify via socket
     const io = getIO();
     io.emit("lot:new", lot);
 
-    // Optional: schedule closure
+    // ✅ Optional: schedule closure
     if (typeof scheduleLotClosure === "function") {
       scheduleLotClosure(io, lot);
     }
 
-    res.status(201).json({ message: "Lot created successfully", lot });
+    res.status(201).json({
+      message: "Lot created successfully",
+      lot,
+      calculatedBasePrice,
+    });
   } catch (err) {
     console.error("Error in createLot:", err);
     res.status(500).json({ message: "Server error" });
@@ -70,7 +107,13 @@ const createLot = async (req, res) => {
 // ===============================
 const getLots = async (req, res) => {
   try {
-    const { status = "open", crop, minPrice, maxPrice, sort = "-createdAt" } = req.query;
+    const {
+      status = "open",
+      crop,
+      minPrice,
+      maxPrice,
+      sort = "-createdAt",
+    } = req.query;
     const { page, limit, skip } = getPagination(req.query);
     const sortObj = parseSort(sort);
 
@@ -96,7 +139,10 @@ const getLots = async (req, res) => {
     if (crop) {
       pipeline.push({
         $match: {
-          "listings.crop": { $regex: `^${escapeRegex(crop)}`, $options: "i" },
+          "listings.crop": {
+            $regex: `^${escapeRegex(crop)}`,
+            $options: "i",
+          },
         },
       });
     }
@@ -115,7 +161,11 @@ const getLots = async (req, res) => {
       },
     });
 
-    pipeline.push({ $addFields: { highestBid: { $arrayElemAt: ["$highestBid", 0] } } });
+    pipeline.push({
+      $addFields: {
+        highestBid: { $arrayElemAt: ["$highestBid", 0] },
+      },
+    });
 
     pipeline.push({
       $lookup: {
@@ -128,7 +178,9 @@ const getLots = async (req, res) => {
 
     pipeline.push({
       $addFields: {
-        "highestBid.bidder": { $arrayElemAt: ["$highestBid.bidderInfo", 0] },
+        "highestBid.bidder": {
+          $arrayElemAt: ["$highestBid.bidderInfo", 0],
+        },
       },
     });
 
@@ -143,7 +195,9 @@ const getLots = async (req, res) => {
       },
     });
 
-    pipeline.push({ $addFields: { fpo: { $arrayElemAt: ["$fpo", 0] } } });
+    pipeline.push({
+      $addFields: { fpo: { $arrayElemAt: ["$fpo", 0] } },
+    });
 
     pipeline.push({
       $project: {
@@ -165,11 +219,17 @@ const getLots = async (req, res) => {
     pipeline.push({
       $facet: {
         metadata: [{ $count: "total" }],
-        data: [{ $sort: sortObj }, { $skip: skip }, { $limit: limit }],
+        data: [
+          { $sort: sortObj },
+          { $skip: skip },
+          { $limit: limit },
+        ],
       },
     });
 
-    const aggResult = await Lot.aggregate(pipeline).allowDiskUse(true).exec();
+    const aggResult = await Lot.aggregate(pipeline)
+      .allowDiskUse(true)
+      .exec();
 
     const totalDocs = aggResult[0].metadata[0]?.total || 0;
     const totalPages = Math.max(Math.ceil(totalDocs / limit), 1);
@@ -200,7 +260,10 @@ const getMyLots = async (req, res) => {
           .sort({ amount: -1 })
           .populate("bidder", "username email");
 
-        return { ...lot.toObject(), highestBid: highestBid || null };
+        return {
+          ...lot.toObject(),
+          highestBid: highestBid || null,
+        };
       })
     );
 
@@ -218,19 +281,31 @@ const closeLot = async (req, res) => {
   try {
     const { lotId } = req.params;
     const lot = await Lot.findById(lotId);
-    if (!lot) return res.status(404).json({ message: "Lot not found" });
-    if (lot.status !== "open") return res.status(400).json({ message: "Lot already closed" });
+    if (!lot)
+      return res.status(404).json({ message: "Lot not found" });
+    if (lot.status !== "open")
+      return res
+        .status(400)
+        .json({ message: "Lot already closed" });
 
-    const topBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 });
+    const topBid = await Bid.findOne({ lot: lotId }).sort({
+      amount: -1,
+    });
     lot.status = "closed";
     lot.winningBid = topBid?._id || null;
     await lot.save();
 
     const io = getIO();
-    io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, { winningBid: topBid });
+    io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, {
+      winningBid: topBid,
+    });
     io.emit("lot:closed", lot._id);
 
-    res.json({ message: "Lot closed successfully", lot, winner: topBid });
+    res.json({
+      message: "Lot closed successfully",
+      lot,
+      winner: topBid,
+    });
   } catch (err) {
     console.error("Error closing lot:", err);
     res.status(500).json({ message: "Server error" });
@@ -246,11 +321,18 @@ const getLotById = async (req, res) => {
 
     const lot = await Lot.findById(id)
       .populate("fpo", "username email")
-      .populate("listings");
+      .populate("listings")
+      .populate({
+        path: "winningBid",
+        populate: { path: "bidder", select: "username email" },
+      });
 
-    if (!lot) return res.status(404).json({ message: "Lot not found" });
+    if (!lot)
+      return res.status(404).json({ message: "Lot not found" });
 
-    const bids = await Bid.find({ lot: id }).sort({ amount: -1 }).populate("bidder", "username email");
+    const bids = await Bid.find({ lot: id })
+      .sort({ amount: -1 })
+      .populate("bidder", "username email");
 
     res.json({ ...lot.toObject(), bids });
   } catch (err) {
@@ -267,14 +349,18 @@ const autoCloseLot = async (lotId) => {
     const lot = await Lot.findById(lotId);
     if (!lot || lot.status !== "open") return;
 
-    const topBid = await Bid.findOne({ lot: lotId }).sort({ amount: -1 });
+    const topBid = await Bid.findOne({ lot: lotId }).sort({
+      amount: -1,
+    });
 
     lot.status = "closed";
     lot.winningBid = topBid?._id || null;
     await lot.save();
 
     const io = getIO();
-    io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, { winningBid: topBid });
+    io.to(`lot:${lotId}`).emit(`lot:closed:${lotId}`, {
+      winningBid: topBid,
+    });
     io.emit("lot:closed", lot._id);
 
     console.log(`Lot ${lotId} auto-closed`);
@@ -290,16 +376,28 @@ const poolListingsIntoLot = async (req, res) => {
   try {
     const { lotId, listingIds } = req.body;
 
-    if (!lotId) return res.status(400).json({ message: "lotId is required" });
+    if (!lotId)
+      return res.status(400).json({ message: "lotId is required" });
     if (!Array.isArray(listingIds) || listingIds.length === 0)
-      return res.status(400).json({ message: "No listings provided" });
+      return res
+        .status(400)
+        .json({ message: "No listings provided" });
 
     const lot = await Lot.findOne({ _id: lotId, fpo: req.user.sub });
-    if (!lot) return res.status(404).json({ message: "Lot not found or unauthorized" });
+    if (!lot)
+      return res
+        .status(404)
+        .json({ message: "Lot not found or unauthorized" });
 
-    const listings = await Listing.find({ _id: { $in: listingIds }, status: "open", lot: null });
+    const listings = await Listing.find({
+      _id: { $in: listingIds },
+      status: "open",
+      lot: null,
+    });
     if (listings.length !== listingIds.length) {
-      return res.status(400).json({ message: "Some listings are invalid or already pooled" });
+      return res.status(400).json({
+        message: "Some listings are invalid or already pooled",
+      });
     }
 
     lot.listings.push(...listings.map((l) => l._id));
@@ -309,10 +407,14 @@ const poolListingsIntoLot = async (req, res) => {
       { $group: { _id: null, total: { $sum: "$quantityKg" } } },
     ]);
 
-    lot.totalQuantity = totalQuantity[0]?.total || lot.totalQuantity || 0;
+    lot.totalQuantity =
+      totalQuantity[0]?.total || lot.totalQuantity || 0;
     await lot.save();
 
-    await Listing.updateMany({ _id: { $in: listingIds } }, { $set: { status: "pooled", lot: lot._id } });
+    await Listing.updateMany(
+      { _id: { $in: listingIds } },
+      { $set: { status: "pooled", lot: lot._id } }
+    );
 
     const io = getIO();
     io.emit("lot:updated", lot);
