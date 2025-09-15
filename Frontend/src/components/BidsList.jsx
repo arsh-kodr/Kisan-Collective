@@ -138,7 +138,7 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
                   lotId={lotId}
                   amount={b.amount}
                   onPaymentSuccess={() => {
-                    toast.success("✅ Payment successful, order confirmed!");
+                    toast.success("Payment successful, order confirmed!");
                     fetchBidsAndLot();
                   }}
                 />

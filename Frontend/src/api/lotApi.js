@@ -2,7 +2,7 @@ import api from "./api";
 
 // All lot-related API calls
 const lotApi = {
-  // ✅ Fetch FPO's own lots
+
   getMyLots: () => api.get("/lots/my-lots", { withCredentials: true }),
 
   // ✅ Create a new lot

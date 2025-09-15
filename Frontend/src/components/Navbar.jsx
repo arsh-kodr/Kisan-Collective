@@ -1,9 +1,8 @@
-// src/components/Navbar.jsx
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Menu, X, Bell } from "lucide-react";
-import api from "../api/api"; // Corrected import
+import { Menu, X } from "lucide-react";
+import api from "../api/api";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -33,14 +32,13 @@ export default function Navbar() {
     navigate("/");
   };
 
-  // Dynamic link styles
   const linkClass = (path) =>
     `text-sm font-medium transition-colors duration-200 ${
       location.pathname === path ? "text-green-700" : "text-gray-700 hover:text-green-600"
     }`;
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
+    <nav className="sticky top-0 z-50 bg-white shadow">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         {/* Logo */}
         <Link
@@ -57,10 +55,7 @@ export default function Navbar() {
           </Link>
 
           {user?.role === "buyer" && (
-            <Link
-              to="/orders"
-              className={linkClass("/orders") + " relative flex items-center gap-1"}
-            >
+            <Link to="/buyer/dashboard" className={linkClass("/buyer/dashboard") + " relative flex items-center gap-1"}>
               Buyer Dashboard
               {unreadOrders > 0 && (
                 <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
@@ -71,8 +66,8 @@ export default function Navbar() {
           )}
 
           {user?.role === "farmer" && (
-            <Link to="/farmer/listings" className={linkClass("/farmer/listings")}>
-              My Listings
+            <Link to="/farmer/dashboard" className={linkClass("/farmer/dashboard")}>
+              Farmer Dashboard
             </Link>
           )}
 
@@ -118,17 +113,13 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white shadow-lg animate-slide-down">
-          <Link
-            to="/lots"
-            onClick={() => setMobileOpen(false)}
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-          >
+          <Link to="/lots" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
             Browse Lots
           </Link>
 
           {user?.role === "buyer" && (
             <Link
-              to="/orders"
+              to="/buyer/dashboard"
               onClick={() => setMobileOpen(false)}
               className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
             >
@@ -142,21 +133,13 @@ export default function Navbar() {
           )}
 
           {user?.role === "farmer" && (
-            <Link
-              to="/farmer/listings"
-              onClick={() => setMobileOpen(false)}
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              My Listings
+            <Link to="/farmer/dashboard" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+              Farmer Dashboard
             </Link>
           )}
 
           {user?.role === "fpo" && (
-            <Link
-              to="/fpo/dashboard"
-              onClick={() => setMobileOpen(false)}
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
+            <Link to="/fpo/dashboard" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
               FPO Dashboard
             </Link>
           )}
@@ -178,18 +161,10 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link
-                to="/login"
-                onClick={() => setMobileOpen(false)}
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
+              <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
                 Login
               </Link>
-              <Link
-                to="/register"
-                onClick={() => setMobileOpen(false)}
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
+              <Link to="/register" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
                 Register
               </Link>
             </>

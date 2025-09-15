@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
-  Wheat, 
-  TrendingUp, 
-  Shield, 
-  Clock, 
+import {
+  Users,
+  Wheat,
+  TrendingUp,
+  Shield,
+  Clock,
   MapPin,
   ChevronRight,
   Star,
   ArrowRight,
-  Gavel
+  Gavel,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 
 export default function Home() {
+  const navigate = useNavigate();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [stats, setStats] = useState({
     farmers: 1250,
     buyers: 890,
     activeLots: 45,
-    totalTrade: 25.6
+    totalTrade: 25.6,
   });
 
   // Mock data for active lots
@@ -34,7 +42,7 @@ export default function Home() {
       bidsCount: 12,
       timeLeft: "2h 45m",
       location: "Punjab",
-      fpo: "Green Valley FPO"
+      fpo: "Green Valley FPO",
     },
     {
       id: 2,
@@ -44,7 +52,7 @@ export default function Home() {
       bidsCount: 8,
       timeLeft: "5h 12m",
       location: "Haryana",
-      fpo: "Golden Grain FPO"
+      fpo: "Golden Grain FPO",
     },
     {
       id: 3,
@@ -54,29 +62,32 @@ export default function Home() {
       bidsCount: 15,
       timeLeft: "1h 23m",
       location: "Maharashtra",
-      fpo: "Harvest Hub FPO"
-    }
+      fpo: "Harvest Hub FPO",
+    },
   ];
 
   const testimonials = [
     {
       name: "Rajesh Kumar",
       role: "Farmer from Punjab",
-      content: "Through KissanCollective, I got 25% better prices for my wheat crop. The FPO system made it so easy!",
-      rating: 5
+      content:
+        "Through KissanCollective, I got 25% better prices for my wheat crop. The FPO system made it so easy!",
+      rating: 5,
     },
     {
       name: "Priya Enterprises",
       role: "Grain Buyer",
-      content: "Transparent bidding process and direct connection with quality produce. Highly recommended!",
-      rating: 5
+      content:
+        "Transparent bidding process and direct connection with quality produce. Highly recommended!",
+      rating: 5,
     },
     {
       name: "Sunflower FPO",
       role: "Farmer Producer Organization",
-      content: "Managing lots and connecting our farmers to buyers has never been this efficient.",
-      rating: 5
-    }
+      content:
+        "Managing lots and connecting our farmers to buyers has never been this efficient.",
+      rating: 5,
+    },
   ];
 
   useEffect(() => {
@@ -93,7 +104,7 @@ export default function Home() {
         farmers: 1250,
         buyers: 890,
         activeLots: 45,
-        totalTrade: 25.6
+        totalTrade: 25.6,
       });
     }, 500);
     return () => clearTimeout(timer);
@@ -115,23 +126,33 @@ export default function Home() {
                 <span className="block text-yellow-300">KissanCollective</span>
               </h1>
               <p className="text-xl lg:text-2xl text-green-100 max-w-3xl mx-auto leading-relaxed">
-                Empowering farmers through FPOs to connect directly with buyers via transparent bidding auctions
+                Empowering farmers through FPOs to connect directly with buyers
+                via transparent bidding auctions
               </p>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button size="lg" className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 text-lg font-semibold">
+              <Button
+                onClick={() => navigate("/lots")}
+                size="lg"
+                className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 text-lg font-semibold"
+              >
                 Browse Active Lots
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-green-700 px-8 py-4 text-lg font-semibold">
+              <Button
+                onClick={() => navigate("/register")}
+                variant="outline"
+                size="lg"
+                className="border-white text-black hover:bg-white hover:text-green-700 px-8 py-4 text-lg font-semibold"
+              >
                 Join as FPO
                 <Users className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </div>
         </div>
-        
+
         {/* Floating elements for visual interest */}
         <div className="absolute top-20 left-10 opacity-20">
           <Wheat className="h-16 w-16 text-yellow-300" />
@@ -181,10 +202,11 @@ export default function Home() {
               How KissanCollective Works
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Simple, transparent, and efficient crop trading through our three-step process
+              Simple, transparent, and efficient crop trading through our
+              three-step process
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <div className="relative">
               <Card className="h-full border-2 border-green-100 hover:border-green-300 transition-colors duration-300 hover:shadow-lg">
@@ -198,7 +220,9 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-gray-600 text-center">
-                    Farmer Producer Organizations aggregate crops from multiple farmers and create bidding lots with quality assurance and proper documentation.
+                    Farmer Producer Organizations aggregate crops from multiple
+                    farmers and create bidding lots with quality assurance and
+                    proper documentation.
                   </CardDescription>
                 </CardContent>
               </Card>
@@ -206,7 +230,7 @@ export default function Home() {
                 <ChevronRight className="h-8 w-8 text-green-400" />
               </div>
             </div>
-            
+
             <div className="relative">
               <Card className="h-full border-2 border-blue-100 hover:border-blue-300 transition-colors duration-300 hover:shadow-lg">
                 <CardHeader className="text-center">
@@ -219,7 +243,9 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-gray-600 text-center">
-                    Verified buyers browse available lots and place competitive bids in real-time auctions with full transparency and fair pricing.
+                    Verified buyers browse available lots and place competitive
+                    bids in real-time auctions with full transparency and fair
+                    pricing.
                   </CardDescription>
                 </CardContent>
               </Card>
@@ -227,7 +253,7 @@ export default function Home() {
                 <ChevronRight className="h-8 w-8 text-blue-400" />
               </div>
             </div>
-            
+
             <div>
               <Card className="h-full border-2 border-purple-100 hover:border-purple-300 transition-colors duration-300 hover:shadow-lg">
                 <CardHeader className="text-center">
@@ -240,7 +266,9 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-gray-600 text-center">
-                    Winning bidders complete secure payments while farmers get guaranteed prices with timely settlements and quality assurance.
+                    Winning bidders complete secure payments while farmers get
+                    guaranteed prices with timely settlements and quality
+                    assurance.
                   </CardDescription>
                 </CardContent>
               </Card>
@@ -261,15 +289,18 @@ export default function Home() {
                 Browse and bid on active crop lots right now
               </p>
             </div>
-            <Button variant="outline" className="hidden sm:flex">
+            <Button onClick={() => navigate("/lots")} variant="outline" className="hidden sm:flex">
               View All Lots
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeLots.map((lot) => (
-              <Card key={lot.id} className="hover:shadow-lg transition-shadow duration-300 border-2 hover:border-green-200">
+              <Card
+                key={lot.id}
+                className="hover:shadow-lg transition-shadow duration-300 border-2 hover:border-green-200"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div>
@@ -280,7 +311,10 @@ export default function Home() {
                         {lot.quantity} • {lot.fpo}
                       </CardDescription>
                     </div>
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    <Badge
+                      variant="outline"
+                      className="bg-red-50 text-red-700 border-red-200"
+                    >
                       <Clock className="w-3 h-3 mr-1" />
                       {lot.timeLeft}
                     </Badge>
@@ -289,8 +323,12 @@ export default function Home() {
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">Current Bid:</span>
-                      <span className="text-lg font-bold text-green-600">{lot.currentBid}</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        Current Bid:
+                      </span>
+                      <span className="text-lg font-bold text-green-600">
+                        {lot.currentBid}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">
@@ -310,7 +348,7 @@ export default function Home() {
               </Card>
             ))}
           </div>
-          
+
           <div className="text-center mt-8 sm:hidden">
             <Button variant="outline">
               View All Lots
@@ -331,14 +369,19 @@ export default function Home() {
               Real experiences from farmers, FPOs, and buyers
             </p>
           </div>
-          
+
           <div className="max-w-3xl mx-auto">
             <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
               <CardContent className="p-8 text-center">
                 <div className="flex justify-center mb-4">
-                  {[...Array(testimonials[currentTestimonial].rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
+                  {[...Array(testimonials[currentTestimonial].rating)].map(
+                    (_, i) => (
+                      <Star
+                        key={i}
+                        className="w-5 h-5 text-yellow-400 fill-current"
+                      />
+                    )
+                  )}
                 </div>
                 <blockquote className="text-lg lg:text-xl mb-6 text-white leading-relaxed">
                   "{testimonials[currentTestimonial].content}"
@@ -353,13 +396,13 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <div className="flex justify-center mt-6 space-x-2">
               {testimonials.map((_, index) => (
                 <button
                   key={index}
                   className={`w-3 h-3 rounded-full transition-colors ${
-                    index === currentTestimonial ? 'bg-white' : 'bg-white/40'
+                    index === currentTestimonial ? "bg-white" : "bg-white/40"
                   }`}
                   onClick={() => setCurrentTestimonial(index)}
                 />
@@ -376,14 +419,22 @@ export default function Home() {
             Ready to Transform Your Crop Trading?
           </h2>
           <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of farmers, FPOs, and buyers who are already benefiting from transparent, efficient crop trading.
+            Join thousands of farmers, FPOs, and buyers who are already
+            benefiting from transparent, efficient crop trading.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 text-lg font-semibold">
+            <Button
+              size="lg"
+              className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 text-lg font-semibold"
+            >
               Start Trading Now
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-green-700 px-8 py-4 text-lg font-semibold">
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-white text-white hover:bg-white hover:text-green-700 px-8 py-4 text-lg font-semibold"
+            >
               Learn More
             </Button>
           </div>

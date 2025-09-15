@@ -7,12 +7,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // load profile on first render
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (token) {
       api
         .get("/auth/profile")
-        .then((res) => setUser(res.data))
+        .then((res) => setUser(res.data.user)) // backend sends { user }
         .catch(() => setUser(null))
         .finally(() => setLoading(false));
     } else {
@@ -36,7 +37,12 @@ export function AuthProvider({ children }) {
     setUser(user);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout"); // clear cookie on backend
+    } catch (e) {
+      console.error("Logout error:", e.message);
+    }
     localStorage.removeItem("accessToken");
     setUser(null);
   };

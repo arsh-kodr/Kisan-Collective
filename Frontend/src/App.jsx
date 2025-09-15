@@ -1,17 +1,17 @@
-// src/App.jsx
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard"; // role-based redirect
 import Lots from "./pages/BrowseLots";
 import LotDetail from "./pages/LotDetail";
-import Orders from "./pages/Orders"; // legacy orders page
-import MyOrders from "./pages/MyOrders"; // buyer-specific dashboard
 import ProtectedRoute from "./components/ProtectedRoute";
 import FarmerListings from "./pages/FarmerListings";
-import FpoDashboard from "./components/fpo/Dashboard";
+import FpoDashboard from "./pages/FpoDashboard";
+import BuyerDashboard from "./pages/BuyerDashboard"; // full buyer dashboard
+import Unauthorized from "./pages/Unauthorized";
+import NotFound from "./pages/NotFound";
 import { Toaster } from "react-hot-toast";
 
 export default function App() {
@@ -21,7 +21,7 @@ export default function App() {
       <Navbar />
 
       {/* Main content */}
-      <main className="container mx-auto">
+      <main className="container mx-auto px-4 py-8">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Home />} />
@@ -30,7 +30,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Protected routes */}
+          {/* Protected role-based dashboards */}
           <Route
             path="/dashboard"
             element={
@@ -40,19 +40,17 @@ export default function App() {
             }
           />
 
-          {/* Buyer-only routes */}
           <Route
-            path="/orders"
+            path="/buyer/dashboard"
             element={
               <ProtectedRoute roles={["buyer"]}>
-                <MyOrders /> {/* Only buyers can see their orders */}
+                <BuyerDashboard />
               </ProtectedRoute>
             }
           />
 
-          {/* Farmer-only routes */}
           <Route
-            path="/farmer/listings"
+            path="/farmer/dashboard"
             element={
               <ProtectedRoute roles={["farmer"]}>
                 <FarmerListings />
@@ -60,7 +58,6 @@ export default function App() {
             }
           />
 
-          {/* FPO-only routes */}
           <Route
             path="/fpo/dashboard"
             element={
@@ -69,6 +66,10 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Unauthorized & 404 */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
