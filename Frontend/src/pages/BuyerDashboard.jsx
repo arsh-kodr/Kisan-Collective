@@ -22,6 +22,8 @@ import {
   AlertCircle
 } from "lucide-react";
 
+
+
 // Mock user context
 const useAuth = () => ({
   user: {
@@ -501,6 +503,7 @@ export default function BuyerDashboard() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState(null);
+ 
 
   // Fetch orders
   useEffect(() => {

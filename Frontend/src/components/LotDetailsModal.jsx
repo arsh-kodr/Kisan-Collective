@@ -8,6 +8,8 @@ export default function LotDetailsModal({ lot, onClose, onAction }) {
   const [bids, setBids] = useState([]);
   const [loadingBids, setLoadingBids] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [bidAmount, setBidAmount] = useState("");
 
   useEffect(() => {
     if (!lot) return;
@@ -15,7 +17,6 @@ export default function LotDetailsModal({ lot, onClose, onAction }) {
       setLoadingBids(true);
       try {
         const res = await api.get(apiRoutes.bids.forLot(lot._id));
-        // defensive
         const payload = res.data;
         setBids(Array.isArray(payload) ? payload : payload.bids || []);
       } catch (err) {
@@ -28,6 +29,33 @@ export default function LotDetailsModal({ lot, onClose, onAction }) {
   }, [lot]);
 
   if (!lot) return null;
+
+  const highestBid = bids.length > 0 ? Math.max(...bids.map((b) => b.amount)) : null;
+  const minAllowed = highestBid ? Math.max(lot.basePrice, highestBid + 1) : lot.basePrice;
+
+  const handlePlaceBid = async () => {
+    const amount = Number(bidAmount);
+    if (isNaN(amount) || amount < minAllowed) {
+      alert(`Bid must be at least ₹${minAllowed}`);
+      return;
+    }
+
+    try {
+      setPlacing(true);
+      const res = await api.post(apiRoutes.bids.create, {
+        lotId: lot._id,
+        amount,
+      });
+      setBids((prev) => [...prev, res.data]); // optimistic update
+      setBidAmount("");
+      onAction && onAction();
+    } catch (err) {
+      console.error("place bid", err);
+      alert(err.response?.data?.message || "Failed to place bid");
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   const handleCloseAuction = async () => {
     try {
@@ -54,7 +82,6 @@ export default function LotDetailsModal({ lot, onClose, onAction }) {
         <ul className="space-y-2 max-h-36 overflow-y-auto mb-3">
           {(lot.listings || []).map((l) => (
             <li key={l._id || l} className="border rounded-lg px-3 py-2">
-              {/* l may be id string or populated object */}
               {typeof l === "string" ? l : (l.crop || l._id)}
             </li>
           ))}
@@ -77,13 +104,39 @@ export default function LotDetailsModal({ lot, onClose, onAction }) {
           )}
         </div>
 
+        {lot.status === "open" && (
+          <div className="mt-4">
+            <label className="block text-sm mb-1">Your Bid (₹)</label>
+            <input
+              type="number"
+              value={bidAmount}
+              onChange={(e) => setBidAmount(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 mb-2"
+              min={minAllowed}
+            />
+            <button
+              onClick={handlePlaceBid}
+              disabled={placing}
+              className="w-full bg-green-500 text-white px-4 py-2 rounded-lg"
+            >
+              {placing ? "Placing..." : `Place Bid (min ₹${minAllowed})`}
+            </button>
+          </div>
+        )}
+
         <div className="flex space-x-2 mt-4">
           {lot.status === "open" && (
-            <button onClick={handleCloseAuction} disabled={closing} className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg">
+            <button
+              onClick={handleCloseAuction}
+              disabled={closing}
+              className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg"
+            >
               {closing ? "Closing..." : "Close Auction"}
             </button>
           )}
-          <button onClick={onClose} className="flex-1 bg-gray-200 px-4 py-2 rounded-lg">Close</button>
+          <button onClick={onClose} className="flex-1 bg-gray-200 px-4 py-2 rounded-lg">
+            Close
+          </button>
         </div>
       </div>
     </div>
