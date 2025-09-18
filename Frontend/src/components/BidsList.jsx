@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import api from "../api/api";
 import { socket } from "../socket";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +12,7 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
   const [isClosed, setIsClosed] = useState(false);
   const [lot, setLot] = useState(null);
   const { user } = useAuth();
+  const listRef = useRef(null);
 
   const normalize = (raw) => ({
     _id: raw._id ?? raw.id,
@@ -27,7 +28,6 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
     try {
       setLoading(true);
       const res = await api.get(`/bids/lots/${lotId}`, { withCredentials: true });
-
       if (res.data?.lot) setLot(res.data.lot);
 
       const rawBids = res.data?.bids ?? [];
@@ -46,6 +46,12 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
     }
   };
 
+  const scrollToTop = () => {
+    if (listRef.current) {
+      listRef.current.scrollTop = 0; // keep newest bid at top
+    }
+  };
+
   useEffect(() => {
     if (!lotId) return;
     fetchBidsAndLot();
@@ -59,6 +65,9 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
         const updated = [nb, ...prev];
         return updated.sort((a, b) => b.amount - a.amount);
       });
+
+      toast.success(`New highest bid: ₹${nb.amount}`);
+      scrollToTop();
     };
 
     const handleLotClosed = ({ winningBid }) => {
@@ -68,12 +77,10 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
         setBids((prev) =>
           prev.map((b) => (String(b._id) === String(wb._id) ? { ...b, isWinner: true } : b))
         );
-
         if (String(winningBid.bidder?._id ?? winningBid.bidder) === String(user?._id)) {
           toast.success("🎉 You won this auction! Pay now to confirm your order.");
         }
       }
-
       onLotUpdate?.({ lot, closed: true });
     };
 
@@ -128,11 +135,9 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
                   {isUserWinner ? "You Won" : "Winner"}
                 </span>
               )}
-
               <span className={`font-semibold ${isWinner ? "text-green-700" : "text-gray-800"}`}>
                 ₹{b.amount}
               </span>
-
               {isUserWinner && isClosed && (
                 <PayNowButton
                   lotId={lotId}
@@ -176,9 +181,16 @@ const BidsList = ({ lotId, winningBidId, onLotUpdate }) => {
           🏁 Auction Closed
         </div>
       )}
-      <ul className="space-y-2">
-        <AnimatePresence>{renderedBids}</AnimatePresence>
-      </ul>
+
+      {/* Scrollable bid list */}
+      <div
+        ref={listRef}
+        className="h-50 overflow-y-auto p-2 border border-gray-200 rounded-xl bg-white"
+      >
+        <ul className="space-y-2">
+          <AnimatePresence>{renderedBids}</AnimatePresence>
+        </ul>
+      </div>  
     </div>
   );
 };

@@ -6,9 +6,7 @@ const lotSchema = new mongoose.Schema(
     fpo: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     listings: [{ type: mongoose.Schema.Types.ObjectId, ref: "Listing" }],
     totalQuantity: { type: Number, default: 0 }, // normalized to kg
-    // base price for the whole lot (price per kg)
     basePrice: { type: Number, default: 0 },
-    // Auction end time (optional)
     endTime: { type: Date, required: false },
     status: {
       type: String,
@@ -20,9 +18,11 @@ const lotSchema = new mongoose.Schema(
       ref: "Bid",
       default: null,
     },
+    bids: [{ type: mongoose.Schema.Types.ObjectId, ref: "Bid" }], // ✅ add this
   },
   { timestamps: true }
 );
+
 
 const Lot = mongoose.model("Lot", lotSchema);
 module.exports = Lot;

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import api from "../api/api";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -10,6 +11,8 @@ export default function Navbar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadOrders, setUnreadOrders] = useState(0);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Fetch buyer unread/pending orders
   useEffect(() => {
@@ -26,6 +29,17 @@ export default function Navbar() {
       fetchOrders();
     }
   }, [user]);
+
+  // Close dropdown if clicked outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -55,7 +69,10 @@ export default function Navbar() {
           </Link>
 
           {user?.role === "buyer" && (
-            <Link to="/buyer/dashboard" className={linkClass("/buyer/dashboard") + " relative flex items-center gap-1"}>
+            <Link
+              to="/buyer/dashboard"
+              className={linkClass("/buyer/dashboard") + " relative flex items-center gap-1"}
+            >
               Buyer Dashboard
               {unreadOrders > 0 && (
                 <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
@@ -77,18 +94,55 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* User Dropdown */}
           {user ? (
-            <>
-              <span className="text-sm font-medium text-gray-700">
-                {user.username || user.fullName?.firstName || user.email}
-              </span>
+            <div className="relative" ref={dropdownRef}>
               <button
-                onClick={handleLogout}
-                className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-transform duration-200 hover:scale-105"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-green-600 transition-colors"
               >
-                Logout
+                {user.username || user.fullName?.firstName || user.email}
+                <motion.div
+                  animate={{ rotate: dropdownOpen ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown size={16} />
+                </motion.div>
               </button>
-            </>
+
+              <AnimatePresence>
+                {dropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50"
+                  >
+                    <button
+                      onClick={() => {
+                        navigate("/profile");
+                        setDropdownOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors ${
+                        location.pathname === "/profile" ? "bg-gray-100 font-semibold" : ""
+                      }`}
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           ) : (
             <>
               <Link to="/login" className={linkClass("/login")}>
@@ -113,7 +167,11 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white shadow-lg animate-slide-down">
-          <Link to="/lots" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+          <Link
+            to="/lots"
+            onClick={() => setMobileOpen(false)}
+            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
             Browse Lots
           </Link>
 
@@ -133,20 +191,31 @@ export default function Navbar() {
           )}
 
           {user?.role === "farmer" && (
-            <Link to="/farmer/dashboard" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+            <Link
+              to="/farmer/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
               Farmer Dashboard
             </Link>
           )}
 
           {user?.role === "fpo" && (
-            <Link to="/fpo/dashboard" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+            <Link
+              to="/fpo/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
               FPO Dashboard
             </Link>
           )}
 
           {user ? (
             <>
-              <span className="block px-4 py-2 text-gray-700">
+              <span
+                onClick={() => navigate("/profile")}
+                className="block px-4 py-2 text-gray-700 cursor-pointer"
+              >
                 {user.username || user.fullName?.firstName || user.email}
               </span>
               <button
@@ -161,10 +230,18 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link to="/login" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+              <Link
+                to="/login"
+                onClick={() => setMobileOpen(false)}
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+              >
                 Login
               </Link>
-              <Link to="/register" onClick={() => setMobileOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+              <Link
+                to="/register"
+                onClick={() => setMobileOpen(false)}
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+              >
                 Register
               </Link>
             </>

@@ -11,45 +11,64 @@ const { getIO } = require("../config/socket");
 const placeBid = async (req, res) => {
   try {
     const { lotId, amount } = req.body;
-    const userId = req.user._id; // ✅ use _id consistently
+    const userId = req.user.sub; // from your auth middleware
 
-    const lot = await Lot.findById(lotId);
+    // 1️⃣ Validate input
+    if (!lotId || !amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid lot ID or bid amount" });
+    }
+
+    // 2️⃣ Fetch the lot
+    const lot = await Lot.findById(lotId).populate("bids");
     if (!lot) return res.status(404).json({ message: "Lot not found" });
-    if (lot.status !== "open")
+    if (lot.status !== "open") {
       return res.status(400).json({ message: "Lot is not open for bidding" });
+    }
 
-    if (amount < lot.basePrice) {
+    // 3️⃣ Check minimum bid
+    const highestBidAmount = lot.bids.length
+      ? Math.max(...lot.bids.map((b) => b.amount))
+      : 0;
+
+    const minRequired = Math.max(highestBidAmount + 1, lot.basePrice);
+    if (amount < minRequired) {
       return res.status(400).json({
-        message: `Bid must be at least base price: ₹${lot.basePrice}`,
+        message: `Bid must be at least ₹${minRequired}`,
       });
     }
 
-    const highestBid = await Bid.findOne({ lot: lotId }).sort("-amount");
-    if (highestBid && amount <= highestBid.amount) {
-      return res.status(400).json({
-        message: `Bid must be higher than current highest: ₹${highestBid.amount}`,
-      });
-    }
-
+    // 4️⃣ Create the bid
     const bid = await Bid.create({
       lot: lotId,
       bidder: userId,
       amount,
     });
 
+    // 5️⃣ Add bid to lot
     lot.bids.push(bid._id);
     await lot.save();
 
-    // ✅ Notify only clients in this lot room
-    const io = getIO();
-    io.to(`lot:${lotId}`).emit("bid:new", { bid });
+    // 6️⃣ Populate bidder info before sending response
+    const populatedBid = await Bid.findById(bid._id).populate(
+      "bidder",
+      "fullName username"
+    );
 
-    return res.status(201).json(bid);
+    // 7️⃣ Emit event to the lot room
+    const io = getIO(); // make sure getIO() returns your Socket.io instance
+    io.to(`lot:${lotId}`).emit("bid:new", { bid: populatedBid });
+
+    return res.status(201).json(populatedBid);
   } catch (err) {
     console.error("placeBid error:", err);
-    res.status(500).json({ message: "Server error" });
+    // Send more detailed message if possible
+    res.status(500).json({
+      message: err.message || "Server error while placing bid",
+    });
   }
 };
+
+
 
 /**
  * GET /api/bids/lots/:lotId/highest

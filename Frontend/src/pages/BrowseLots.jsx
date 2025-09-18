@@ -1,11 +1,6 @@
 // src/pages/BrowseLots.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Search,
-  Filter,
-  RefreshCw,
-  X,
-  Calendar,
   MapPin,
   Users,
   Wheat,
@@ -13,7 +8,6 @@ import {
 } from "lucide-react";
 import api from "../api/api";
 import config from "../config/config";
-import { useNavigate } from "react-router-dom";
 
 // shadcn/ui
 import {
@@ -24,6 +18,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+
+// auth + bidding
+import { useAuth } from "../contexts/AuthContext";
+import BidsList from "../components/BidsList";
+import PlaceBidForm from "../components/PlaceBidForm";
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -40,12 +39,9 @@ const useDebounce = (value, delay) => {
 };
 
 // Lot Card Component
-const LotCard = ({ lot, onViewDetails }) => {
-  const navigate = useNavigate();
+const LotCard = ({ lot, onViewDetails, onPlaceBid }) => {
   return (
-    <div
-      className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-green-200 transform hover:-translate-y-1"
-    >
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-green-200 transform hover:-translate-y-1">
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -97,7 +93,7 @@ const LotCard = ({ lot, onViewDetails }) => {
         {/* Actions */}
         <div className="flex gap-3">
           <Button
-            onClick={() => navigate("/bidList")}
+            onClick={() => onPlaceBid(lot)}
             className="flex-1 bg-green-600 hover:bg-green-700"
           >
             Place Bid
@@ -166,6 +162,9 @@ export default function BrowseLots() {
   const [sort, setSort] = useState("-createdAt");
 
   const [selectedLot, setSelectedLot] = useState(null);
+  const [modalTab, setModalTab] = useState("details"); // "details" | "bids"
+
+  const { user } = useAuth();
 
   const debouncedCrop = useDebounce(crop, 350);
   const debouncedMinPrice = useDebounce(minPrice, 350);
@@ -269,7 +268,14 @@ export default function BrowseLots() {
                   <LotCard
                     key={lot._id}
                     lot={lot}
-                    onViewDetails={(l) => setSelectedLot(l)}
+                    onViewDetails={(l) => {
+                      setSelectedLot(l);
+                      setModalTab("details");
+                    }}
+                    onPlaceBid={(l) => {
+                      setSelectedLot(l);
+                      setModalTab("bids");
+                    }}
                   />
                 ))}
               </div>
@@ -298,42 +304,72 @@ export default function BrowseLots() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="mt-4 space-y-3">
-                <p>
-                  <span className="font-medium">Base Price:</span>{" "}
-                  ₹{selectedLot.basePrice?.toLocaleString("en-IN")} /kg
-                </p>
-                <p>
-                  <span className="font-medium">Quantity:</span>{" "}
-                  {selectedLot.totalQuantity} kg
-                </p>
-                <p>
-                  <span className="font-medium">Bids:</span>{" "}
-                  {selectedLot.bidCount}
-                </p>
+              {modalTab === "details" && (
+                <div className="mt-4 space-y-3">
+                  <p>
+                    <span className="font-medium">Base Price:</span>{" "}
+                    ₹{selectedLot.basePrice?.toLocaleString("en-IN")} /kg
+                  </p>
+                  <p>
+                    <span className="font-medium">Quantity:</span>{" "}
+                    {selectedLot.totalQuantity} kg
+                  </p>
+                  <p>
+                    <span className="font-medium">Bids:</span>{" "}
+                    {selectedLot.bidCount}
+                  </p>
 
-                {/* Listings */}
-                <div>
-                  <h4 className="font-semibold mb-2">Included Listings:</h4>
-                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                    {selectedLot.listings.map((listing) => (
-                      <li key={listing._id}>
-                        {listing.crop} — {listing.quantity}kg @ ₹
-                        {listing.price}/kg
-                      </li>
-                    ))}
-                  </ul>
+                  {/* Listings */}
+                  <div>
+                    <h4 className="font-semibold mb-2">Included Listings:</h4>
+                    <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                      {selectedLot.listings.map((listing) => (
+                        <li key={listing._id}>
+                          {listing.crop} — {listing.quantity}kg @ ₹
+                          {listing.price}/kg
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setSelectedLot(null)}>
+                      Close
+                    </Button>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => setModalTab("bids")}
+                    >
+                      Place Bid
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="mt-6 flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setSelectedLot(null)}>
-                  Close
-                </Button>
-                <Button className="bg-green-600 hover:bg-green-700">
-                  Place Bid
-                </Button>
-              </div>
+              {modalTab === "bids" && (
+                <div className="mt-4">
+                  {/* Bids List */}
+                  <BidsList lotId={selectedLot._id} winningBid={selectedLot.highestBid} />
+
+                  {/* Place Bid Form - only for buyers */}
+                  {user?.role === "buyer" ? (
+                    <div className="mt-6">
+                      <PlaceBidForm lotId={selectedLot._id} basePrice={selectedLot.basePrice} />
+                    </div>
+                  ) : (
+                    <p className="text-gray-600 mt-4">
+                      Only buyers can place bids on lots.
+                    </p>
+                  )}
+
+                  <div className="mt-6 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setModalTab("details")}>
+                      Back to Details
+                    </Button>
+                    <Button onClick={() => setSelectedLot(null)}>Close</Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </DialogContent>

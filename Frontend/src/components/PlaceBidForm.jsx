@@ -3,6 +3,8 @@ import api from "../api/api";
 import toast from "react-hot-toast";
 import { socket } from "../socket";
 import { motion } from "framer-motion";
+import config from "../config/config";
+const { apiRoutes } = config;
 
 const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
   const [amount, setAmount] = useState("");
@@ -11,6 +13,7 @@ const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [disabled, setDisabled] = useState(false);
 
+  // Fetch lot and bids
   const fetchLotAndBids = async () => {
     try {
       const res = await api.get(`/bids/lots/${lotId}`, { withCredentials: true });
@@ -22,44 +25,49 @@ const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
         setHighestBid(sorted[0]);
       }
 
-      const closed = res.data?.lot?.status === "closed" || res.data?.lot?.status === "sold";
+      const closed = ["closed", "sold"].includes(res.data?.lot?.status);
       setDisabled(closed);
       onLotUpdate?.({ lot: res.data.lot, closed });
     } catch (err) {
-      console.error(err);
+      console.error("fetchLotAndBids error:", err);
     }
   };
 
   useEffect(() => {
     fetchLotAndBids();
 
+    socket.emit("join", { room: `lot:${lotId}` });
+
     const handleNewBid = ({ bid }) => {
-      if (!highestBid || bid.amount > highestBid.amount) {
-        setHighestBid(bid);
-        toast.success(`New highest bid: ₹${bid.amount} by ${bid.bidder?.username || "someone"}`);
-      }
+      setHighestBid(prev => {
+        if (!prev || bid.amount > prev.amount) {
+          toast.success(`New highest bid: ₹${bid.amount}`);
+          return bid;
+        }
+        return prev;
+      });
     };
 
     const handleLotClosed = ({ winningBid }) => {
       setDisabled(true);
       toast.error("Auction ended! You can no longer place bids.");
       if (winningBid) setHighestBid(winningBid);
-      onLotUpdate?.({ lot, closed: true });
+      onLotUpdate?.({ lot: lot, closed: true });
     };
 
-    socket.on(`bid:new:${lotId}`, handleNewBid);
-    socket.on(`lot:closed:${lotId}`, handleLotClosed);
+    socket.on("bid:new", handleNewBid);
+    socket.on("lot:closed", handleLotClosed);
 
     return () => {
-      socket.off(`bid:new:${lotId}`, handleNewBid);
-      socket.off(`lot:closed:${lotId}`, handleLotClosed);
+      socket.off("bid:new", handleNewBid);
+      socket.off("lot:closed", handleLotClosed);
     };
-  }, [lotId, highestBid]);
+  }, [lotId]);
 
+  // Minimum next bid
   const minNextBid = useMemo(() => {
     if (!lot) return 0;
-    const lotMin = lot.totalQuantity * lot.basePrice;
-    return highestBid?.amount ? Math.max(lotMin, highestBid.amount + 1) : lotMin;
+    return highestBid?.amount ? highestBid.amount + 1 : lot.basePrice;
   }, [lot, highestBid]);
 
   const handleSubmit = async (e) => {
@@ -75,24 +83,28 @@ const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
     setLoading(true);
     try {
       const res = await api.post(
-        "/bids/place-bid",
+        `${apiRoutes.bids.placeBid}`,
         { lotId, amount: bidAmount },
         { withCredentials: true }
       );
-      const newBid = res.data.bid;
+
+      const newBid = res.data; // backend returns populated bidder
       setAmount("");
       setHighestBid(newBid);
       onBidPlaced?.(newBid);
       toast.success("Bid placed successfully!");
     } catch (err) {
-      console.error(err);
+      console.error("placeBid error:", err);
       toast.error(err.response?.data?.message || "Failed to place bid");
     } finally {
       setLoading(false);
     }
   };
 
-  const isHighestBidder = highestBid?.bidder?._id === currentUserId;
+  // Safely check if current user is highest bidder
+  const isHighestBidder =
+    highestBid?.bidder?._id === currentUserId ||
+    highestBid?.bidder === currentUserId;
 
   return (
     <motion.div
@@ -105,14 +117,23 @@ const PlaceBidForm = ({ lotId, currentUserId, onBidPlaced, onLotUpdate }) => {
         <h3 className="text-lg font-semibold text-gray-800">Place a Bid</h3>
         <span className="text-sm text-gray-600">
           Current Highest:{" "}
-          <span className={`font-semibold ${isHighestBidder ? "text-blue-700" : "text-green-700"}`}>
-            {highestBid ? `₹${highestBid.amount}` : `Min ₹${lot ? lot.totalQuantity * lot.basePrice : 0}`}
+          <span
+            className={`font-semibold ${
+              isHighestBidder ? "text-blue-700" : "text-green-700"
+            }`}
+          >
+            {highestBid
+              ? `₹${highestBid.amount}`
+              : `Min ₹${lot ? lot.basePrice : 0}`}
             {isHighestBidder && " (You are highest bidder)"}
           </span>
         </span>
       </div>
 
-      <form className="flex flex-col sm:flex-row gap-3 sm:items-center" onSubmit={handleSubmit}>
+      <form
+        className="flex flex-col sm:flex-row gap-3 sm:items-center"
+        onSubmit={handleSubmit}
+      >
         <input
           type="number"
           value={amount}

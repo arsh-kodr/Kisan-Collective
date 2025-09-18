@@ -10,12 +10,14 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import FarmerListings from "./pages/FarmerListings";
 import FpoDashboard from "./pages/FpoDashboard";
 import BuyerDashboard from "./pages/BuyerDashboard"; 
+import Profile from "./pages/ProfilePage"; // Import the Profile component
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "react-hot-toast";
 import TotalListing from "./pages/TotalListing";
 import BidsList from "./components/BidsList";
 import PlaceBidForm from "./components/PlaceBidForm";
+
 
 export default function App() {
   return (
@@ -34,6 +36,16 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/place-bids" element={<PlaceBidForm/>} />
           <Route path="/bidList" element={<BidsList />} />
+
+          {/* Protected profile route - accessible to all authenticated users */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected role-based dashboards */}
           <Route
@@ -54,8 +66,6 @@ export default function App() {
             }
           />
 
-         
-
           <Route
             path="/farmer/dashboard"
             element={
@@ -73,6 +83,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          
           <Route
             path="/listings"
             element={
