@@ -21,15 +21,33 @@ import {
   Gavel,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import config from "../config/config";
+const { apiRoutes } = config;
+import api from "../api/api";
 
 export default function Home() {
   const navigate = useNavigate();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
+  const [lots, setLots] = useState([]);
   const [stats, setStats] = useState({
     farmers: 1250,
     buyers: 890,
     activeLots: 45,
     totalTrade: 25.6,
+  });
+
+  const fetchLots = async () => {
+    try {
+      const res = await api.get(apiRoutes.lots.all);
+      const lotsData = res.data?.lots || [];
+      setLots(Array.isArray(lotsData) ? lotsData : []);
+    } catch (err) {
+      console.error("Failed to fetch lots:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLots();
   });
 
   // Mock data for active lots
@@ -289,64 +307,85 @@ export default function Home() {
                 Browse and bid on active crop lots right now
               </p>
             </div>
-            <Button onClick={() => navigate("/lots")} variant="outline" className="hidden sm:flex">
+            <Button
+              onClick={() => navigate("/lots")}
+              variant="outline"
+              className="hidden sm:flex"
+            >
               View All Lots
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeLots.map((lot) => (
-              <Card
-                key={lot.id}
-                className="hover:shadow-lg transition-shadow duration-300 border-2 hover:border-green-200"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg font-bold text-gray-900">
-                        {lot.crop}
-                      </CardTitle>
-                      <CardDescription className="text-sm text-gray-600 mt-1">
-                        {lot.quantity} • {lot.fpo}
-                      </CardDescription>
+            {lots.map((lot) => {
+              // Safely extract values
+              const cropName =
+                lot.name || lot.listings?.[0]?.crop || "Unknown Crop";
+              const quantity =
+                lot.totalQuantity || lot.listings?.[0]?.quantityKg || 0;
+              const fpoName = lot.fpo?.username || "Unknown FPO";
+              const currentBid = lot.highestBid?.amount || lot.basePrice || 0;
+              const bidsCount = lot.highestBid ? 1 : 0; // Adjust if you track bid history
+              const location = lot.listings?.[0]?.location || "Unknown";
+              const endTime = new Date(lot.endTime);
+              const timeLeft = Math.max(
+                0,
+                Math.floor((endTime - new Date()) / 1000 / 60 / 60)
+              ); // hours left
+
+              return (
+                <Card
+                  key={lot._id}
+                  className="hover:shadow-lg transition-shadow duration-300 border-2 hover:border-green-200"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg font-bold text-gray-900">
+                          {cropName}
+                        </CardTitle>
+                        <CardDescription className="text-sm text-gray-600 mt-1">
+                          {quantity} kg • {fpoName}
+                        </CardDescription>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="bg-red-50 text-red-700 border-red-200"
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        {timeLeft > 0 ? `${timeLeft}h left` : "Closed"}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="bg-red-50 text-red-700 border-red-200"
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {lot.timeLeft}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">
-                        Current Bid:
-                      </span>
-                      <span className="text-lg font-bold text-green-600">
-                        {lot.currentBid}
-                      </span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-600">
+                          Current Bid:
+                        </span>
+                        <span className="text-lg font-bold text-green-600">
+                          ₹{currentBid}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">
+                          <MapPin className="w-3 h-3 inline mr-1" />
+                          {location}
+                        </span>
+                        <span className="text-sm text-blue-600 font-medium">
+                          {bidsCount} {bidsCount === 1 ? "bid" : "bids"}
+                        </span>
+                      </div>
+                      <Button onClick={() => navigate("/lots")} className="w-full bg-green-600 hover:bg-green-700 hover:bg-yellow-600">
+                        Browse Lots
+                        <TrendingUp className="ml-2 h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
-                        <MapPin className="w-3 h-3 inline mr-1" />
-                        {lot.location}
-                      </span>
-                      <span className="text-sm text-blue-600 font-medium">
-                        {lot.bidsCount} bids
-                      </span>
-                    </div>
-                    <Button className="w-full bg-green-600 hover:bg-green-700">
-                      Place Bid
-                      <TrendingUp className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <div className="text-center mt-8 sm:hidden">

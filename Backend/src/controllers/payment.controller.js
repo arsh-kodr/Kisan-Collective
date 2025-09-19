@@ -1,4 +1,3 @@
-// src/controllers/payment.controller.js
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
@@ -18,7 +17,6 @@ const razorpay = new Razorpay({
 const initiatePayment = async (req, res) => {
   try {
     const { lotId, amount } = req.body;
-
     if (!lotId || !amount) {
       return res.status(400).json({ message: "lotId and amount required" });
     }
@@ -31,24 +29,22 @@ const initiatePayment = async (req, res) => {
       path: "winningBid",
       populate: { path: "bidder" },
     });
-
     if (!lot || !lot.winningBid) {
       return res.status(404).json({ message: "Lot or winning bid not found" });
     }
-
     if (lot.winningBid.bidder._id.toString() !== req.user.sub) {
       return res.status(403).json({ message: "Not authorized to pay for this lot" });
     }
 
-    // Create short receipt (≤40 chars)
-    const shortLotId = lotId.toString().slice(-10); // last 10 chars
-    const receipt = `lot_${shortLotId}_${Date.now()}`;
+    // Create short receipt (≤40 chars) but keep lotId in metadata
+    const receipt = `lot_${lotId}_${Date.now()}`.slice(-40);
 
     // Create Razorpay order
     const rpOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency: "INR",
       receipt,
+      notes: { lotId: lotId.toString(), buyerId: req.user.sub }, // ✅ safer lookup
     });
 
     // Create local transaction
@@ -76,16 +72,11 @@ const initiatePayment = async (req, res) => {
 const verifyPayment = async (req, res) => {
   try {
     const { orderId, paymentId, signature } = req.body;
-
     if (!orderId || !paymentId || !signature) {
       return res.status(400).json({ message: "orderId, paymentId, signature required" });
     }
 
-    const tx = await Transaction.findOne({
-      providerOrderId: orderId,
-      buyer: req.user.sub,
-    });
-
+    const tx = await Transaction.findOne({ providerOrderId: orderId, buyer: req.user.sub });
     if (!tx) return res.status(404).json({ success: false, message: "Pending transaction not found" });
 
     const expectedSignature = crypto
@@ -97,6 +88,7 @@ const verifyPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid signature" });
     }
 
+    // Update transaction → succeeded
     const updated = await Transaction.findOneAndUpdate(
       { _id: tx._id, status: "pending" },
       {
@@ -112,18 +104,30 @@ const verifyPayment = async (req, res) => {
 
     const finalTx = updated || tx;
 
-    await Order.findOneAndUpdate(
-      { lot: finalTx.lot, buyer: finalTx.buyer },
-      {
-        $set: {
+    // Ensure order exists or update
+    let order = await Order.findOne({ lot: finalTx.lot, buyer: finalTx.buyer });
+    if (!order) {
+      const lot = await Lot.findById(finalTx.lot).populate("winningBid");
+      if (lot?.winningBid) {
+        order = await Order.create({
+          lot: lot._id,
+          buyer: finalTx.buyer,
+          fpo: lot.fpo,
+          bid: lot.winningBid._id,
+          amount: lot.winningBid.amount,
+          transaction: finalTx._id,
           paymentStatus: "paid",
           status: "processing",
-          transaction: finalTx._id,
-        },
+        });
       }
-    );
+    } else {
+      order.paymentStatus = "paid";
+      order.status = "processing";
+      order.transaction = finalTx._id;
+      await order.save();
+    }
 
-    return res.json({ success: true, message: "Payment verified", transaction: finalTx });
+    return res.json({ success: true, message: "Payment verified", transaction: finalTx, order });
   } catch (err) {
     console.error("verifyPayment error:", err);
     return res.status(500).json({ message: "Verification failed" });
@@ -140,7 +144,6 @@ const webhookHandler = async (req, res) => {
 
     const rawBody = req.body;
     const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-
     if (signature !== expected) {
       return res.status(400).json({ ok: false, message: "invalid signature" });
     }
@@ -152,30 +155,27 @@ const webhookHandler = async (req, res) => {
       const payment = event.payload.payment.entity;
 
       let tx = await Transaction.findOne({ providerOrderId: payment.order_id });
-
       if (!tx) {
-        try {
-          const rpOrder = await razorpay.orders.fetch(payment.order_id);
-          const receipt = rpOrder?.receipt;
-          if (receipt?.startsWith("lot_")) {
-            const lotId = receipt.split("_")[1];
-            const lot = await Lot.findById(lotId).populate({ path: "winningBid", populate: { path: "bidder" } });
-            if (lot?.winningBid?.bidder) {
-              tx = await Transaction.create({
-                lot: lot._id,
-                bid: lot.winningBid._id,
-                buyer: lot.winningBid.bidder._id,
-                amountPaise: payment.amount,
-                currency: payment.currency,
-                providerOrderId: payment.order_id,
-                providerPaymentId: payment.id,
-                providerPaymentMeta: payment,
-                status: evt === "payment.captured" ? "succeeded" : "failed",
-              });
-            }
+        // Try to reconstruct tx from order notes
+        const rpOrder = await razorpay.orders.fetch(payment.order_id).catch(() => null);
+        const lotId = rpOrder?.notes?.lotId;
+        const buyerId = rpOrder?.notes?.buyerId;
+
+        if (lotId && buyerId) {
+          const lot = await Lot.findById(lotId).populate("winningBid");
+          if (lot?.winningBid?.bidder) {
+            tx = await Transaction.create({
+              lot: lot._id,
+              bid: lot.winningBid._id,
+              buyer: lot.winningBid.bidder._id,
+              amountPaise: payment.amount,
+              currency: payment.currency,
+              providerOrderId: payment.order_id,
+              providerPaymentId: payment.id,
+              providerPaymentMeta: payment,
+              status: evt === "payment.captured" ? "succeeded" : "failed",
+            });
           }
-        } catch (err) {
-          console.error("Failed to fetch Razorpay order:", err.message);
         }
       }
 
@@ -183,18 +183,42 @@ const webhookHandler = async (req, res) => {
         const targetStatus = evt === "payment.captured" ? "succeeded" : "failed";
 
         const updated = await Transaction.findOneAndUpdate(
-          { _id: tx._id, status: "pending" },
-          { $set: { providerPaymentId: payment.id, providerPaymentMeta: payment, status: targetStatus } },
+          { _id: tx._id },
+          {
+            $set: {
+              providerPaymentId: payment.id,
+              providerPaymentMeta: payment,
+              status: targetStatus,
+            },
+          },
           { new: true }
         );
 
         const finalTx = updated || tx;
 
-        const orderUpdate = targetStatus === "succeeded"
-          ? { paymentStatus: "paid", status: "processing", transaction: finalTx._id }
-          : { paymentStatus: "failed", status: "payment_failed" };
-
-        await Order.findOneAndUpdate({ lot: finalTx.lot, buyer: finalTx.buyer }, { $set: orderUpdate }, { new: true });
+        // Ensure order exists
+        let order = await Order.findOne({ lot: finalTx.lot, buyer: finalTx.buyer });
+        if (!order && targetStatus === "succeeded") {
+          const lot = await Lot.findById(finalTx.lot).populate("winningBid");
+          if (lot?.winningBid) {
+            order = await Order.create({
+              lot: lot._id,
+              buyer: finalTx.buyer,
+              fpo: lot.fpo,
+              bid: lot.winningBid._id,
+              amount: lot.winningBid.amount,
+              transaction: finalTx._id,
+              paymentStatus: "paid",
+              status: "processing",
+            });
+          }
+        } else if (order) {
+          const orderUpdate =
+            targetStatus === "succeeded"
+              ? { paymentStatus: "paid", status: "processing", transaction: finalTx._id }
+              : { paymentStatus: "failed", status: "payment_failed" };
+          await Order.findByIdAndUpdate(order._id, { $set: orderUpdate });
+        }
 
         console.log(`Processed payment event: ${evt} for tx: ${finalTx._id}`);
       }

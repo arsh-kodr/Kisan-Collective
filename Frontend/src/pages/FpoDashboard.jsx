@@ -285,31 +285,34 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const { success, error } = useToast();
 
-  useEffect(() => {
-    if (isOpen && lot) {
-      // Load bids for the specific lot
-      fetchBids(lot._id);
-    }
-  }, [isOpen, lot]);
-
+  // Fetch bids for this lot
   const fetchBids = async (lotId) => {
     try {
-      // Assuming you have an API method to get bids for a lot
-      const lotBids = await lotApi.getBids(lotId);
-      setBids(Array.isArray(lotBids) ? lotBids : []);
+      const res = await api.get(`/bids/lots/${lotId}`, { withCredentials: true });
+
+      console.log("Full response:", res.data);
+      console.log("Bids only:", res.data.bids);
+
+      setBids(Array.isArray(res.data.bids) ? res.data.bids : []);
     } catch (err) {
       console.error("Failed to fetch bids:", err);
       error("Failed to fetch bids");
     }
   };
 
+  useEffect(() => {
+    if (isOpen && lot?._id) {
+      fetchBids(lot._id);
+    }
+  }, [isOpen, lot]);
+
   const handleCloseLot = async () => {
     setLoading(true);
     try {
       await lotApi.closeLot(lot._id);
       success("Auction closed successfully!");
-      onSuccess();
-      onClose();
+      onSuccess?.();
+      onClose?.();
     } catch (err) {
       console.error("Failed to close auction:", err);
       error("Failed to close auction");
@@ -320,11 +323,13 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
 
   if (!isOpen || !lot) return null;
 
+  // Sort bids by amount (highest first)
   const sortedBids = [...bids].sort((a, b) => b.amount - a.amount);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">{lot.name}</h2>
@@ -340,7 +345,9 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
           </button>
         </div>
 
+        {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          {/* Status + Base Price */}
           <div className="flex items-center justify-between">
             <span
               className={`px-4 py-2 rounded-full text-sm font-semibold ${
@@ -360,6 +367,7 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
             </div>
           </div>
 
+          {/* Bids */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Bids ({sortedBids.length})
@@ -381,9 +389,10 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
                     }`}
                   >
                     <div className="flex items-center justify-between">
+                      {/* Bidder Info */}
                       <div>
                         <div className="font-semibold text-gray-800">
-                          {bid.buyer?.fullName || "Anonymous Buyer"}
+                          {bid.bidder?.username || bid.bidder?.email || "Anonymous"}
                           {index === 0 && (
                             <span className="ml-2 px-2 py-1 text-xs bg-green-600 text-white rounded-full">
                               Highest Bid
@@ -395,6 +404,8 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
                           {new Date(bid.createdAt).toLocaleTimeString()}
                         </div>
                       </div>
+
+                      {/* Bid Amount */}
                       <div className="text-right">
                         <div className="text-lg font-bold text-gray-800">
                           ₹{bid.amount}/kg
@@ -414,6 +425,7 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
           </div>
         </div>
 
+        {/* Footer - Close Auction */}
         {lot.status === "open" && (
           <div className="p-6 border-t border-gray-200">
             <button
@@ -430,10 +442,10 @@ const LotDetailsModal = ({ lot, isOpen, onClose, onSuccess }) => {
   );
 };
 
+
 // Main Dashboard Component
 const FPODashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   // Data states
@@ -441,6 +453,7 @@ const FPODashboard = () => {
   const [pendingListings, setPendingListings] = useState([]);
   const [approvedListings, setApprovedListings] = useState([]);
   const [lots, setLots] = useState([]);
+  const [user, setUser] = useState([]);
   const [loading, setLoading] = useState({
     overview: true,
     listings: true,
@@ -469,6 +482,25 @@ const FPODashboard = () => {
       setLoading((prev) => ({ ...prev, overview: false }));
     }
   };
+
+  const fetchUser = async () => {
+    try {
+      const res = await api.get(`${apiRoutes.user.profile}`);
+      const userData = res.data?.user || [];
+      console.log(userData);
+      
+      
+      setLots(Array.isArray(userData) ? userData : []);
+    } catch (error) {
+      console.error("Error fetching listings:", error);
+      error("Failed to fetch User");
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+  }, [])
+
 
   const fetchListings = async () => {
     try {
@@ -568,7 +600,6 @@ const FPODashboard = () => {
       color: "bg-gradient-to-br from-purple-500 to-purple-600",
       change: "+24%",
     },
-   
   ];
 
   return (
@@ -582,7 +613,7 @@ const FPODashboard = () => {
           <div className="flex items-center gap-4">
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                Welcome back, FPO Manager!
+                Welcome back,
               </h2>
               <p className="text-sm text-gray-600">
                 {activeTab === "overview" &&

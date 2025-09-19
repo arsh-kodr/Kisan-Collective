@@ -18,9 +18,15 @@ const orderSchema = new mongoose.Schema(
       pincode: String,
     },
 
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+    },
+
     status: {
       type: String,
-      enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
+      enum: ["pending", "processing", "shipped", "delivered", "cancelled", "payment_failed"],
       default: "pending",
     },
   },

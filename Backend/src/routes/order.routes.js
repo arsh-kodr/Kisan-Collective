@@ -9,16 +9,16 @@ const {
 
 const router = express.Router();
 
-// Buyer creates order (after winning auction)
+// Buyer creates order
 router.post("/create", authenticate, authorize("buyer"), createOrder);
 
 // Buyer views their orders
 router.get("/my-orders", authenticate, authorize("buyer"), getMyOrders);
 
-// FPO views orders for their lots
+// FPO views orders
 router.get("/fpo-orders", authenticate, authorize("fpo"), getFpoOrders);
 
-// FPO/Admin updates order status
-router.patch("/:orderId/status", authenticate, updateOrderStatus);
+// FPO/Admin updates status
+router.patch("/:orderId/status", authenticate, authorize(["fpo", "admin"]), updateOrderStatus);
 
 module.exports = router;

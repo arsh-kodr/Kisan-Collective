@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+// src/App.jsx
+import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Register from "./pages/Register";
@@ -10,14 +11,15 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import FarmerListings from "./pages/FarmerListings";
 import FpoDashboard from "./pages/FpoDashboard";
 import BuyerDashboard from "./pages/BuyerDashboard"; 
-import Profile from "./pages/ProfilePage"; // Import the Profile component
+import Profile from "./pages/ProfilePage";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "react-hot-toast";
 import TotalListing from "./pages/TotalListing";
 import BidsList from "./components/BidsList";
 import PlaceBidForm from "./components/PlaceBidForm";
-
+import MyOrders from "./pages/MyOrders";     // ✅ added
+import Orders from "./pages/Orders";         // ✅ added
 
 export default function App() {
   return (
@@ -26,7 +28,7 @@ export default function App() {
       <Navbar />
 
       {/* Main content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto ">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Home />} />
@@ -34,10 +36,10 @@ export default function App() {
           <Route path="/lots/:id" element={<LotDetail />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/place-bids" element={<PlaceBidForm/>} />
+          <Route path="/place-bids" element={<PlaceBidForm />} />
           <Route path="/bidList" element={<BidsList />} />
 
-          {/* Protected profile route - accessible to all authenticated users */}
+          {/* Protected profile route */}
           <Route
             path="/profile"
             element={
@@ -47,7 +49,7 @@ export default function App() {
             }
           />
 
-          {/* Protected role-based dashboards */}
+          {/* Protected dashboards */}
           <Route
             path="/dashboard"
             element={
@@ -89,6 +91,25 @@ export default function App() {
             element={
               <ProtectedRoute roles={["fpo"]}>
                 <TotalListing />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ Orders routes */}
+          <Route
+            path="/my-orders"
+            element={
+              <ProtectedRoute roles={["buyer"]}>
+                <MyOrders />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute roles={["buyer"]}>
+                <Orders />
               </ProtectedRoute>
             }
           />

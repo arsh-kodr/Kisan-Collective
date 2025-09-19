@@ -27,13 +27,17 @@ const createLot = async (req, res) => {
     if (endTime) {
       const parsed = new Date(endTime);
       if (isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
-        return res.status(400).json({ message: "endTime must be a valid future date" });
+        return res
+          .status(400)
+          .json({ message: "endTime must be a valid future date" });
       }
     }
 
     if (basePrice !== undefined && basePrice !== null) {
       if (Number(basePrice) < 0 || Number.isNaN(Number(basePrice))) {
-        return res.status(400).json({ message: "basePrice must be a valid non-negative number" });
+        return res
+          .status(400)
+          .json({ message: "basePrice must be a valid non-negative number" });
       }
     }
 
@@ -54,7 +58,7 @@ const createLot = async (req, res) => {
 
     listings.forEach((l) => {
       const qty =
-        (typeof l.quantity === "number" && l.unit)
+        typeof l.quantity === "number" && l.unit
           ? qtyToKg(l.quantity, l.unit)
           : l.quantityKg
           ? l.quantityKg
@@ -66,15 +70,17 @@ const createLot = async (req, res) => {
       totalQty += qty;
     });
 
-    const calculatedBasePrice = totalQty > 0 ? Math.round(totalValue / totalQty) : 0;
+    const calculatedBasePrice =
+      totalQty > 0 ? Math.round(totalValue / totalQty) : 0;
 
-    const finalBasePrice = basePrice !== undefined && basePrice !== null
-      ? Number(basePrice)
-      : calculatedBasePrice;
+    const finalBasePrice =
+      basePrice !== undefined && basePrice !== null
+        ? Number(basePrice)
+        : calculatedBasePrice;
 
     const totalQuantity = listings.reduce((sum, l) => {
       const qty =
-        (typeof l.quantity === "number" && l.unit)
+        typeof l.quantity === "number" && l.unit
           ? qtyToKg(l.quantity, l.unit)
           : l.quantityKg
           ? l.quantityKg
@@ -125,7 +131,7 @@ const createLot = async (req, res) => {
     });
 
     if (typeof scheduleLotClosure === "function" && lot.endTime) {
-      scheduleLotClosure(io, lot);
+      scheduleLotClosure(lot);
     }
 
     res.status(201).json({
@@ -198,7 +204,9 @@ const getLots = async (req, res) => {
       },
     });
 
-    pipeline.push({ $addFields: { highestBid: { $arrayElemAt: ["$highestBid", 0] } } });
+    pipeline.push({
+      $addFields: { highestBid: { $arrayElemAt: ["$highestBid", 0] } },
+    });
 
     pipeline.push({
       $lookup: {
@@ -210,7 +218,9 @@ const getLots = async (req, res) => {
     });
 
     pipeline.push({
-      $addFields: { "highestBid.bidder": { $arrayElemAt: ["$highestBid.bidderInfo", 0] } },
+      $addFields: {
+        "highestBid.bidder": { $arrayElemAt: ["$highestBid.bidderInfo", 0] },
+      },
     });
 
     pipeline.push({ $project: { "highestBid.bidderInfo": 0 } });
@@ -306,7 +316,11 @@ const getMyLots = async (req, res) => {
           as: "highestBid.bidderInfo",
         },
       },
-      { $addFields: { "highestBid.bidder": { $arrayElemAt: ["$highestBid.bidderInfo", 0] } } },
+      {
+        $addFields: {
+          "highestBid.bidder": { $arrayElemAt: ["$highestBid.bidderInfo", 0] },
+        },
+      },
       { $project: { "highestBid.bidderInfo": 0 } },
     ];
 
@@ -328,11 +342,16 @@ const closeLot = async (req, res) => {
     const lot = await Lot.findById(lotId);
     if (!lot) return res.status(404).json({ message: "Lot not found" });
     if (String(lot.fpo) !== String(req.user.sub)) {
-      return res.status(403).json({ message: "Not authorized to close this lot" });
+      return res
+        .status(403)
+        .json({ message: "Not authorized to close this lot" });
     }
 
     const result = await finalizeLotClosure(lotId, req.user.sub);
-    if (!result) return res.status(400).json({ message: "Lot already closed or cannot be closed" });
+    if (!result)
+      return res
+        .status(400)
+        .json({ message: "Lot already closed or cannot be closed" });
 
     const io = getIO();
     // 🔔 Notify all users in the lot room
@@ -411,7 +430,8 @@ const poolListingsIntoLot = async (req, res) => {
       return res.status(400).json({ message: "No listings provided" });
 
     const lot = await Lot.findOne({ _id: lotId, fpo: req.user.sub });
-    if (!lot) return res.status(404).json({ message: "Lot not found or unauthorized" });
+    if (!lot)
+      return res.status(404).json({ message: "Lot not found or unauthorized" });
 
     const listings = await Listing.find({
       _id: { $in: listingIds },
@@ -419,17 +439,21 @@ const poolListingsIntoLot = async (req, res) => {
       lot: null,
     });
     if (listings.length !== listingIds.length) {
-      return res.status(400).json({ message: "Some listings are invalid or already pooled" });
+      return res
+        .status(400)
+        .json({ message: "Some listings are invalid or already pooled" });
     }
 
     const existingIds = new Set(lot.listings.map((id) => String(id)));
-    const toAdd = listings.map((l) => String(l._id)).filter((id) => !existingIds.has(id));
+    const toAdd = listings
+      .map((l) => String(l._id))
+      .filter((id) => !existingIds.has(id));
     lot.listings.push(...toAdd);
 
     const allListings = await Listing.find({ _id: { $in: lot.listings } });
     const totalQty = allListings.reduce((sum, l) => {
       const qty =
-        (typeof l.quantity === "number" && l.unit)
+        typeof l.quantity === "number" && l.unit
           ? qtyToKg(l.quantity, l.unit)
           : l.quantityKg
           ? l.quantityKg

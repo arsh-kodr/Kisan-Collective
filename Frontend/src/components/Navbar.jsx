@@ -41,6 +41,11 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -50,6 +55,44 @@ export default function Navbar() {
     `text-sm font-medium transition-colors duration-200 ${
       location.pathname === path ? "text-green-700" : "text-gray-700 hover:text-green-600"
     }`;
+
+  // Helper: user display name
+  const displayName = user?.username || user?.fullName?.firstName || user?.email || "User";
+
+  // Common Links
+  const commonLinks = (
+    <>
+      <Link to="/lots" className={linkClass("/lots")}>
+        Browse Lots
+      </Link>
+
+      {user?.role === "buyer" && (
+        <Link
+          to="/buyer/dashboard"
+          className={linkClass("/buyer/dashboard") + " relative flex items-center gap-1"}
+        >
+          Buyer Dashboard
+          {unreadOrders > 0 && (
+            <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
+              {unreadOrders}
+            </span>
+          )}
+        </Link>
+      )}
+
+      {user?.role === "farmer" && (
+        <Link to="/farmer/dashboard" className={linkClass("/farmer/dashboard")}>
+          Farmer Dashboard
+        </Link>
+      )}
+
+      {user?.role === "fpo" && (
+        <Link to="/fpo/dashboard" className={linkClass("/fpo/dashboard")}>
+          FPO Dashboard
+        </Link>
+      )}
+    </>
+  );
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow">
@@ -64,35 +107,7 @@ export default function Navbar() {
 
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-6">
-          <Link to="/lots" className={linkClass("/lots")}>
-            Browse Lots
-          </Link>
-
-          {user?.role === "buyer" && (
-            <Link
-              to="/buyer/dashboard"
-              className={linkClass("/buyer/dashboard") + " relative flex items-center gap-1"}
-            >
-              Buyer Dashboard
-              {unreadOrders > 0 && (
-                <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
-                  {unreadOrders}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {user?.role === "farmer" && (
-            <Link to="/farmer/dashboard" className={linkClass("/farmer/dashboard")}>
-              Farmer Dashboard
-            </Link>
-          )}
-
-          {user?.role === "fpo" && (
-            <Link to="/fpo/dashboard" className={linkClass("/fpo/dashboard")}>
-              FPO Dashboard
-            </Link>
-          )}
+          {commonLinks}
 
           {/* User Dropdown */}
           {user ? (
@@ -101,7 +116,7 @@ export default function Navbar() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-green-600 transition-colors"
               >
-                {user.username || user.fullName?.firstName || user.email}
+                {displayName}
                 <motion.div
                   animate={{ rotate: dropdownOpen ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
@@ -165,89 +180,53 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu */}
-      {mobileOpen && (
-        <div className="md:hidden bg-white shadow-lg animate-slide-down">
-          <Link
-            to="/lots"
-            onClick={() => setMobileOpen(false)}
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="md:hidden bg-white shadow-lg overflow-hidden"
           >
-            Browse Lots
-          </Link>
+            <div className="flex flex-col">
+              {commonLinks}
 
-          {user?.role === "buyer" && (
-            <Link
-              to="/buyer/dashboard"
-              onClick={() => setMobileOpen(false)}
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
-            >
-              Buyer Dashboard
-              {unreadOrders > 0 && (
-                <span className="bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
-                  {unreadOrders}
-                </span>
+              {user ? (
+                <>
+                  <span
+                    onClick={() => navigate("/profile")}
+                    className="block px-4 py-2 text-gray-700 cursor-pointer hover:bg-gray-100"
+                  >
+                    {displayName}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Register
+                  </Link>
+                </>
               )}
-            </Link>
-          )}
-
-          {user?.role === "farmer" && (
-            <Link
-              to="/farmer/dashboard"
-              onClick={() => setMobileOpen(false)}
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              Farmer Dashboard
-            </Link>
-          )}
-
-          {user?.role === "fpo" && (
-            <Link
-              to="/fpo/dashboard"
-              onClick={() => setMobileOpen(false)}
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              FPO Dashboard
-            </Link>
-          )}
-
-          {user ? (
-            <>
-              <span
-                onClick={() => navigate("/profile")}
-                className="block px-4 py-2 text-gray-700 cursor-pointer"
-              >
-                {user.username || user.fullName?.firstName || user.email}
-              </span>
-              <button
-                onClick={() => {
-                  handleLogout();
-                  setMobileOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 transition-colors"
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                onClick={() => setMobileOpen(false)}
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
-                onClick={() => setMobileOpen(false)}
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                Register
-              </Link>
-            </>
-          )}
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }

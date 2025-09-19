@@ -10,28 +10,27 @@ const PayNowButton = ({ lotId, amount, onPaymentSuccess }) => {
 
   const handlePayment = async () => {
     if (!window.Razorpay) {
-      toast.error("Razorpay SDK not loaded. Please refresh the page.");
+      toast.error("⚠️ Razorpay SDK not loaded. Please refresh.");
       return;
     }
 
     setLoading(true);
     try {
-      // Step 1: Initiate order on backend
+      // Step 1: Create order on backend
       const { data } = await api.post(
         "/payments/initiate",
         { lotId, amount },
         { withCredentials: true }
       );
-
       const { order } = data;
 
-      // Step 2: Setup Razorpay options
+      // Step 2: Setup Razorpay checkout
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: order.amount,
+        amount: order.amount, // already in paise
         currency: order.currency,
         name: "KissanCollective",
-        description: "Payment for winning lot",
+        description: `Payment for Lot ${lotId}`,
         order_id: order.id,
         handler: async function (response) {
           try {
@@ -46,29 +45,28 @@ const PayNowButton = ({ lotId, amount, onPaymentSuccess }) => {
               { withCredentials: true }
             );
 
-            toast.success("✅ Payment successful, order confirmed!");
+            toast.success("✅ Payment successful!");
             onPaymentSuccess?.(verifyRes.data.transaction);
           } catch (err) {
             console.error("Payment verification failed:", err);
-            toast.error("Payment verification failed, please contact support.");
+            toast.error("❌ Verification failed, please contact support.");
           }
         },
         prefill: {
-          name: user?.fullName?.firstName
-            ? `${user.fullName.firstName} ${user.fullName.lastName || ""}`
-            : user?.username || "Buyer",
+          name:
+            user?.fullName?.firstName || user?.username || "Buyer",
           email: user?.email || "",
           contact: user?.phone || "",
         },
-        theme: { color: "#22c55e" }, // green theme
+        theme: { color: "#22c55e" }, // Tailwind green-600
       };
 
-      // Step 4: Open Razorpay payment window
+      // Step 4: Open Razorpay checkout
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
-      console.error("Failed to initiate payment:", err);
-      toast.error("Failed to initiate payment, please try again.");
+      console.error("Initiate payment failed:", err);
+      toast.error("❌ Failed to start payment, try again.");
     } finally {
       setLoading(false);
     }

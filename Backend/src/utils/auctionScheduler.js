@@ -1,40 +1,38 @@
 // utils/auctionScheduler.js
 const Lot = require("../models/lot.model");
-const Bid = require("../models/bid.model");
-const { getIO } = require("../config/socket");
+const { finalizeLotClosure } = require("../services/lot.service");
 
 /**
- * Schedule auto-close for a lot
- * @param {Object} lot - Lot document
+ * Schedule auto-close for a lot using finalizeLotClosure from services.
+ * Accepts either a Lot document or an object with _id and endTime.
  */
 const scheduleLotClosure = (lot) => {
-  if (!lot.endTime || lot.status !== "open") return;
+  if (!lot || !lot.endTime || lot.status !== "open") return;
 
-  const delay = new Date(lot.endTime) - Date.now();
-  if (delay <= 0) return; // Already expired
+  const delay = new Date(lot.endTime).getTime() - Date.now();
+  if (delay <= 0) return; // already passed
 
   setTimeout(async () => {
     try {
-      const topBid = await Bid.findOne({ lot: lot._id }).sort({ amount: -1 });
-      lot.status = "closed";
-      lot.winningBid = topBid?._id || null;
-      await lot.save();
-
-      const io = getIO();
-
-      // Notify all clients in this lot room
-      io.to(`lot:${lot._id}`).emit(`lot:closed:${lot._id}`, {
-        winningBid: topBid,
-      });
-
-      // Notify globally (frontend dashboards, etc.)
-      io.emit("lot:ended", { lotId: lot._id });
-
-      console.log(`Lot ${lot._id} auto-closed`);
+      await finalizeLotClosure(lot._id, "system");
     } catch (err) {
-      console.error("Error auto-closing lot:", err);
+      console.error("Error running scheduled finalizeLotClosure for lot", lot._id, err);
     }
   }, delay);
 };
 
-module.exports = { scheduleLotClosure };
+/**
+ * On server start, find open lots with future endTime and schedule them.
+ * Call this once after DB + socket are up.
+ */
+const initLotSchedulers = async () => {
+  try {
+    const lots = await Lot.find({ status: "open", endTime: { $gt: new Date() } }).lean();
+    lots.forEach(scheduleLotClosure);
+    console.log(`auctionScheduler: scheduled ${lots.length} upcoming lots`);
+  } catch (err) {
+    console.error("Error initializing lot schedulers:", err);
+  }
+};
+
+module.exports = { scheduleLotClosure, initLotSchedulers };

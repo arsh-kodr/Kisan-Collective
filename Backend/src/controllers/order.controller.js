@@ -3,7 +3,7 @@ const Lot = require("../models/lot.model");
 const Bid = require("../models/bid.model");
 const Transaction = require("../models/transaction.model");
 
-// Create Order (called after successful payment webhook)
+// Create Order (called after successful payment or manually by buyer)
 const createOrder = async (req, res) => {
   try {
     const { lotId, transactionId, shippingAddress } = req.body;
@@ -38,13 +38,14 @@ const createOrder = async (req, res) => {
       amount: bid.amount,
       transaction: transaction._id,
       shippingAddress: shippingAddress || {},
-      status: transaction.status === "paid" ? "paid" : "pending",
+      paymentStatus: transaction.status === "succeeded" ? "paid" : "pending",
+      status: transaction.status === "succeeded" ? "processing" : "pending",
     });
 
     res.status(201).json({ message: "Order created successfully", order });
   } catch (err) {
     console.error("createOrder error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
@@ -54,13 +55,13 @@ const getMyOrders = async (req, res) => {
     const orders = await Order.find({ buyer: req.user.sub })
       .populate("lot", "name status")
       .populate("fpo", "username email")
-      .populate("transaction", "status amount")
+      .populate("transaction", "status amountPaise")
       .sort({ createdAt: -1 });
 
     res.json({ orders });
   } catch (err) {
     console.error("getMyOrders error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
@@ -70,13 +71,13 @@ const getFpoOrders = async (req, res) => {
     const orders = await Order.find({ fpo: req.user.sub })
       .populate("lot", "name status")
       .populate("buyer", "username email")
-      .populate("transaction", "status amount")
+      .populate("transaction", "status amountPaise")
       .sort({ createdAt: -1 });
 
     res.json({ orders });
   } catch (err) {
     console.error("getFpoOrders error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
@@ -99,7 +100,7 @@ const updateOrderStatus = async (req, res) => {
     res.json({ message: "Order updated successfully", order });
   } catch (err) {
     console.error("updateOrderStatus error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
